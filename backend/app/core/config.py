@@ -18,7 +18,7 @@ class Settings(BaseSettings):
     jwt_secret: str = "dev-only-secret-change-me"
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 60 * 24 * 7
-    cors_origins: str = "http://localhost:5173,http://localhost:3000"
+    cors_origins: str = "http://localhost:5173,http://localhost:3000,https://agama-ai.vercel.app"
 
     # --- ollama ---
     ollama_base_url: str = "https://ollama.com"

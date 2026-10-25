@@ -1,0 +1,48 @@
+@import "@fontsource/inter/400.css";
+@import "@fontsource/inter/500.css";
+@import "@fontsource/inter/600.css";
+@import "@fontsource/inter/700.css";
+@import "@fontsource/jetbrains-mono/400.css";
+@import "@fontsource/jetbrains-mono/500.css";
+@import "@fontsource/jetbrains-mono/600.css";
+@import "material-symbols/outlined.css";
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html, body { margin: 0; padding: 0; }
+  body { overscroll-behavior: none; font-family: Inter, system-ui, sans-serif; }
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-thumb { background: #c7c4d8; border-radius: 8px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+}
+
+.material-symbols-outlined {
+  font-variation-settings: "FILL" 0, "wght" 400, "GRAD" 0, "opsz" 24;
+  user-select: none;
+}
+.msi-fill { font-variation-settings: "FILL" 1, "wght" 400, "GRAD" 0, "opsz" 24; }
+.tabular { font-variant-numeric: tabular-nums; }
+
+/* Rendered markdown (task prompts, reading material, journal) */
+.prose-agama { color: #131b2e; font-size: 14px; line-height: 22px; }
+.prose-agama h1, .prose-agama h2, .prose-agama h3 { font-weight: 600; letter-spacing: -0.015em; margin: 1.1em 0 .4em; }
+.prose-agama h1 { font-size: 22px; } .prose-agama h2 { font-size: 18px; } .prose-agama h3 { font-size: 15px; }
+.prose-agama p { margin: .6em 0; }
+.prose-agama ul { list-style: disc; padding-left: 1.3em; margin: .6em 0; }
+.prose-agama ol { list-style: decimal; padding-left: 1.3em; margin: .6em 0; }
+.prose-agama code { font-family: "JetBrains Mono", monospace; font-size: 12.5px; background: #eaedff; color: #3525cd; padding: 1px 5px; border-radius: 4px; }
+.prose-agama pre { background: #0b1020; color: #dbe4ff; padding: 12px 14px; border-radius: 8px; overflow-x: auto; margin: .8em 0; }
+.prose-agama pre code { background: transparent; color: inherit; padding: 0; font-size: 12.5px; line-height: 20px; }
+.prose-agama blockquote { border-left: 3px solid #c3c0ff; padding-left: 12px; color: #464555; margin: .8em 0; }
+.prose-agama table { border-collapse: collapse; margin: .8em 0; font-size: 13px; }
+.prose-agama th, .prose-agama td { border: 1px solid #c7c4d8; padding: 4px 8px; }
+.prose-agama a { color: #3525cd; text-decoration: underline; }
+.prose-agama strong { font-weight: 600; }
+
+@keyframes fadeUp { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.fade-up { animation: fadeUp .18s ease-out; }
+@keyframes slideIn { from { transform: translateX(24px); opacity: 0; } to { transform: none; opacity: 1; } }
+.slide-in { animation: slideIn .22s ease-out; }

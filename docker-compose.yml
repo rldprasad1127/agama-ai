@@ -1,0 +1,18 @@
+services:
+  backend:
+    build: ./backend # Tells Docker to build from the backend folder
+    image: agama-backend
+    container_name: agama-api
+    ports:
+      - "8000:8000"
+    env_file:
+      - ./backend/.env
+
+  frontend:
+    build: ./frontend # Tells Docker to build from the frontend folder
+    image: agama-frontend
+    container_name: agama-ui
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend

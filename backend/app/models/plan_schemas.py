@@ -1,0 +1,155 @@
+"""Request/response models for /api/plans."""
+from __future__ import annotations
+
+import datetime as dt
+from typing import Any, Literal, Optional
+
+from pydantic import BaseModel, Field
+
+
+class PlanCreate(BaseModel):
+    track: Literal["DSA", "INTERVIEW", "ENGLISH"] = "DSA"
+    mode: Literal["LEARN", "PRACTICE"] = "LEARN"
+    days: int = Field(default=30, ge=3, le=120)
+    minutes_per_day: int = Field(default=60, ge=15, le=240)
+    level: Literal["beginner", "intermediate", "advanced"] = "beginner"
+    difficulty: Literal["easy", "medium", "hard", "mixed", "adaptive"] = "adaptive"
+    topics: list[str] = Field(default_factory=list, max_length=30)
+    known_topics: list[str] = Field(default_factory=list, max_length=30)
+    weak_topics: list[str] = Field(default_factory=list, max_length=30)
+    language: str = "python"
+    skip_weekends: bool = False
+    start_date: Optional[dt.date] = None
+    # INTERVIEW
+    role: str = Field(default="", max_length=80)
+    experience: Literal["fresher", "junior", "senior"] = "fresher"
+    company_type: str = Field(default="", max_length=60)
+    # ENGLISH
+    cefr: Literal["A1", "A2", "B1", "B2", "C1"] = "B1"
+    focus_topics: list[str] = Field(default_factory=list, max_length=20)
+
+
+class PreviewBlock(BaseModel):
+    title: str
+    mode: str
+    minutes: int
+    phase: str
+
+
+class PreviewDay(BaseModel):
+    day: int
+    date: dt.date
+    blocks: list[PreviewBlock]
+
+
+class PlanPreview(BaseModel):
+    title: str
+    track: str
+    mode: str
+    days: int
+    minutes_per_day: int
+    start_date: dt.date
+    end_date: dt.date
+    topics: list[dict[str, Any]]
+    trimmed_topics: list[str]
+    total_blocks: int
+    total_minutes: int
+    by_phase: dict[str, int]
+    sample_days: list[PreviewDay]
+
+
+class PlanTopicOut(BaseModel):
+    key: str
+    name: str
+    first_day: int
+    last_day: int
+    blocks_total: int
+    blocks_done: int
+    mastery: Optional[int] = None
+    help_requests: int = 0
+    status: Literal["done", "current", "upcoming"]
+
+
+class PlanOut(BaseModel):
+    id: str
+    title: str
+    track: str
+    mode: str
+    level: str
+    days: int
+    minutes_per_day: int
+    start_date: dt.date
+    end_date: dt.date
+    difficulty: str
+    language: str
+    status: str
+    skip_weekends: bool
+    day_index: int                  # today's 1-based day in the plan (0 = not started, >days = past the end)
+    days_left: int
+    blocks_total: int
+    blocks_done: int
+    minutes_total: int
+    minutes_done: int
+    progress_pct: int
+    missed_count: int
+    missed_minutes: int
+    today_count: int
+    next_task_id: Optional[str] = None
+    topics: list[PlanTopicOut]
+    trimmed_topics: list[str]
+    rebalanced_count: int
+    config: dict[str, Any]
+
+
+class PlanBlockOut(BaseModel):
+    id: str
+    title: str
+    mode: str
+    phase: str
+    minutes: int
+    status: str
+    topic_key: Optional[str] = None
+    difficulty: Optional[str] = None
+    score: Optional[int] = None
+    missed: bool = False
+    practice_kind: Optional[str] = None
+
+
+class PlanDayOut(BaseModel):
+    day: int
+    date: dt.date
+    is_today: bool
+    blocks: list[PlanBlockOut]
+
+
+class RebalanceIn(BaseModel):
+    extend_days: int = Field(default=0, ge=0, le=60)
+
+
+class RebalanceOut(BaseModel):
+    moved: int
+    dropped: list[str]
+    new_end_date: dt.date
+    plan: PlanOut
+
+
+class PlacementQuestion(BaseModel):
+    id: str
+    topic: str
+    topic_name: str
+    prompt: str
+    options: list[str]
+
+
+class PlacementIn(BaseModel):
+    answers: dict[str, int]
+
+
+class PlacementOut(BaseModel):
+    score: int
+    total: int
+    level: Literal["beginner", "intermediate", "advanced"]
+    known_topics: list[str]
+    weak_topics: list[str]
+    suggested_mode: Literal["LEARN", "PRACTICE"]
+    by_topic: dict[str, bool]

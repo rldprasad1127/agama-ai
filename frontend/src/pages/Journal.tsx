@@ -123,7 +123,7 @@ export default function Journal() {
         <div className="flex items-center gap-1.5 flex-wrap" role="tablist">
           {TABS.map((t) => (
             <button key={t.label} role="tab" aria-selected={mode === t.key} onClick={() => setMode(t.key)}
-              className={cx("inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-body-sm font-semibold", mode === t.key ? "bg-primary-container text-on-primary" : "bg-surface-container-lowest text-on-surface-variant hover:bg-surface-container")}>
+              className={cx("inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-body-sm font-semibold", mode === t.key ? "bg-primary-container text-on-primary-container" : "bg-surface-container-lowest text-on-surface-variant hover:bg-surface-container")}>
               {t.icon && <Icon name={t.icon} className="text-[16px]" />}{t.label}
               <span className={cx("px-1.5 rounded-full font-label-micro text-label-micro", mode === t.key ? "bg-white/20" : "bg-surface-container")}>{counts?.[t.count] ?? 0}</span></button>))}
         </div>

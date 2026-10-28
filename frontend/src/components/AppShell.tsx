@@ -3,6 +3,7 @@ import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { ScheduleProvider, useSchedule } from "@/hooks/useSchedule";
 import { useAiStatus } from "@/hooks/useAiStatus";
+import { useTheme } from "@/hooks/useTheme";
 import { Icon } from "./Icon";
 import { NewBlockModal } from "./NewBlockModal";
 import { cx, fmtMinutes } from "@/lib/utils";
@@ -25,6 +26,7 @@ function Shell() {
   const [open, setOpen] = useState(false);
   const [menu, setMenu] = useState(false);
   const aiOk = ai?.reachable;
+  const { resolved, setPref } = useTheme();
 
   return (
     <div className="min-h-screen bg-surface">
@@ -46,7 +48,7 @@ function Shell() {
             {NAV.map((n) => (
               <NavLink key={n.to} to={n.to} end={n.end} onClick={() => setOpen(false)}
                 className={({ isActive }) => cx("flex items-center gap-space-sm px-space-sm py-2 rounded-lg transition-colors",
-                  isActive ? "bg-primary-container text-on-primary-container font-semibold" : "text-on-surface-variant hover:bg-surface-container hover:text-on-surface")}>
+                  isActive ? "bg-primary-container text-on-primary-container-container font-semibold" : "text-on-surface-variant hover:bg-surface-container hover:text-on-surface")}>
                 <Icon name={n.icon} className="text-[20px]" /><span className="font-body-md text-body-md">{n.label}</span>
               </NavLink>
             ))}
@@ -96,7 +98,10 @@ function Shell() {
               <span className="font-label-code text-label-code text-primary font-semibold max-w-[140px] truncate">{ai?.model ?? "AI"}</span>
               <span className={cx("font-label-micro text-label-micro px-1 rounded", aiOk ? "bg-secondary-container text-on-secondary-container" : "bg-error-container text-on-error-container")}>{ai ? (aiOk ? (ai.is_cloud ? "CLOUD" : "LOCAL") : "OFFLINE") : "…"}</span>
             </button>
-            <button onClick={() => openNewBlock()} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary text-on-primary hover:bg-primary-container transition-colors shadow-sm">
+            <button onClick={() => setPref(resolved === "dark" ? "light" : "dark")} aria-label={resolved === "dark" ? "Switch to light theme" : "Switch to dark theme"}
+              title={resolved === "dark" ? "Switch to light theme" : "Switch to dark theme"} className="p-1.5 rounded-lg text-on-surface-variant hover:bg-surface-container">
+              <Icon name={resolved === "dark" ? "light_mode" : "dark_mode"} className="text-[20px]" /></button>
+            <button onClick={() => openNewBlock()} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary text-on-primary hover:brightness-110 transition-colors shadow-sm">
               <Icon name="add" className="text-[18px]" /><span className="font-body-sm text-body-sm font-semibold">New Block</span>
             </button>
           </div>

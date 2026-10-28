@@ -70,7 +70,7 @@ export function SpeechWorkspace({ task, content, setContent, checklistDone, setC
           <span className="font-semibold flex items-center gap-1.5"><Icon name="description" className="text-primary text-[18px]" />Dialogue &amp; Pitch Script</span>
           <div className="ml-auto flex items-center gap-1 font-label-code text-label-code">
             <span className="text-on-surface-variant mr-1">SCROLL:</span>
-            {([0, 1, 1.5, 2] as const).map((s) => <button key={s} onClick={() => setSpeed(s)} aria-pressed={speed === s} className={cx("px-2 py-1 rounded", speed === s ? "bg-primary-container text-on-primary" : "hover:bg-surface-container")}>{s === 0 ? "off" : `${s}x`}</button>)}
+            {([0, 1, 1.5, 2] as const).map((s) => <button key={s} onClick={() => setSpeed(s)} aria-pressed={speed === s} className={cx("px-2 py-1 rounded", speed === s ? "bg-primary-container text-on-primary-container" : "hover:bg-surface-container")}>{s === 0 ? "off" : `${s}x`}</button>)}
           </div>
         </div>
         <div ref={script} className="flex-1 overflow-y-auto p-6" style={{ fontSize }}>
@@ -94,7 +94,7 @@ export function SpeechWorkspace({ task, content, setContent, checklistDone, setC
         <div className="rounded-xl bg-surface-container-lowest border border-outline-variant/50 p-4 flex flex-col items-center gap-3">
           <div className="w-full flex items-center justify-between font-label-micro text-label-micro uppercase text-on-surface-variant"><span>Live master recording</span><span>{rec.status === "idle" ? "Ready" : rec.status}</span></div>
           <button onClick={() => (live ? rec.pause() : rec.start())} aria-label={live ? "Pause recording" : "Start recording"}
-            className={cx("w-28 h-28 rounded-full flex flex-col items-center justify-center shadow-md transition-colors", live ? "bg-error text-on-error animate-pulse" : "bg-primary-container text-on-primary hover:bg-primary")}>
+            className={cx("w-28 h-28 rounded-full flex flex-col items-center justify-center shadow-md transition-colors", live ? "bg-error text-on-error animate-pulse" : "bg-primary-container text-on-primary-container hover:bg-primary")}>
             <Icon name={live ? "pause" : "mic"} className="text-[40px]" fill /><span className="font-label-micro text-label-micro mt-0.5">{live ? "REC LIVE" : rec.status === "paused" ? "RESUME" : "START"}</span></button>
           <Spectrum getFreq={rec.getFreq} active={live} />
           <div className="flex items-center gap-2 flex-wrap justify-center">

@@ -115,7 +115,7 @@ export function HelpPanel({ task, open, onClose, code, runOutput, elapsed, faile
                   {ok && !got && !prevOk && t.level < 4 && <p className="text-body-sm text-on-surface-variant mt-1">Tip: try the earlier hints first.</p>}
                   {t.level === 4 && confirm4 && !got && <div className="mt-2 rounded-lg bg-error-container/50 p-3 text-body-sm">Revealing the full solution <b>halves the XP</b> for this block. Sure?
                     <div className="mt-2 flex gap-2"><button onClick={() => setConfirm4(false)} className="px-3 py-1 rounded-lg bg-surface-container font-semibold">Keep trying</button><button disabled={!!busy} onClick={() => void hint(4, true)} className="px-3 py-1 rounded-lg bg-error text-on-error font-semibold">{busy === "hint4" ? "…" : "Show it"}</button></div></div>}
-                  {got && <div className="mt-2"><Markdown>{got.text}</Markdown>{got.solution && <pre className="mt-2 rounded-lg bg-[#0e1328] text-slate-200 p-3 text-[12px] overflow-x-auto">{got.solution}</pre>}</div>}
+                  {got && <div className="mt-2"><Markdown>{got.text}</Markdown>{got.solution && <pre className="mt-2 rounded-lg bg-surface-container-low text-on-surface p-3 text-[12px] overflow-x-auto">{got.solution}</pre>}</div>}
                 </div>);
             })}
           </>)}

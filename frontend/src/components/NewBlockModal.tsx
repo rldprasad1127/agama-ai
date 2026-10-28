@@ -102,7 +102,7 @@ export function NewBlockModal() {
       <div role="dialog" aria-modal="true" aria-label="Configure task block" className="fade-up w-full max-w-3xl bg-surface-container-lowest rounded-xl shadow-2xl my-auto">
         <div className="flex items-start justify-between gap-4 p-6 pb-2">
           <div className="flex items-start gap-3">
-            <div className="w-12 h-12 rounded-xl bg-primary-container text-on-primary flex items-center justify-center shrink-0"><Icon name="terminal" /></div>
+            <div className="w-12 h-12 rounded-xl bg-primary-container text-on-primary-container flex items-center justify-center shrink-0"><Icon name="terminal" /></div>
             <div>
               <div className="flex items-center gap-2"><h2 className="font-headline-md text-headline-md text-on-surface">{editing ? "Edit Task Block" : "Configure Task Block"}</h2>
                 <span className="px-2 py-0.5 rounded bg-primary-fixed text-on-primary-fixed-variant font-label-micro text-label-micro uppercase">Focus Session</span></div>
@@ -130,7 +130,7 @@ export function NewBlockModal() {
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3" role="radiogroup">
               {MODES.map((m) => (
                 <button key={m} role="radio" aria-checked={mode === m} onClick={() => setMode(m)}
-                  className={cx("relative text-left rounded-lg p-3 transition-colors", mode === m ? "bg-primary-container text-on-primary" : "bg-surface-container-low hover:bg-surface-container text-on-surface")}>
+                  className={cx("relative text-left rounded-lg p-3 transition-colors", mode === m ? "bg-primary-container text-on-primary-container" : "bg-surface-container-low hover:bg-surface-container text-on-surface")}>
                   <div className="flex items-center justify-between"><Icon name={MODE_ICON[m]} />{mode === m && <Icon name="check_circle" fill className="text-[18px]" />}</div>
                   <div className="mt-3 font-body-md font-semibold text-body-md">{m === "CODE" ? "Code Editor" : m === "PROSE" ? "Prose / Script" : m === "THEORY" ? "Theory & Recall" : "Speech Pitch"}</div>
                   <div className={cx("text-body-sm", mode === m ? "text-on-primary-container" : "text-on-surface-variant")}>{MODE_HELP[m]}</div>
@@ -160,7 +160,7 @@ export function NewBlockModal() {
                   <button aria-label="Increase" className="px-3 py-2 hover:bg-surface-container rounded-r-lg" onClick={() => setDuration((d) => Math.min(480, d + 5))}><Icon name="add" className="text-[18px]" /></button>
                 </div>
                 {DURATIONS.map((d) => (
-                  <button key={d} onClick={() => setDuration(d)} className={cx("px-2.5 py-1.5 rounded-lg font-label-code text-label-code", duration === d ? "bg-primary-container text-on-primary" : "bg-surface-container-low hover:bg-surface-container text-on-surface-variant")}>{d}m</button>
+                  <button key={d} onClick={() => setDuration(d)} className={cx("px-2.5 py-1.5 rounded-lg font-label-code text-label-code", duration === d ? "bg-primary-container text-on-primary-container" : "bg-surface-container-low hover:bg-surface-container text-on-surface-variant")}>{d}m</button>
                 ))}
               </div>
               {when === "today" && <p className="mt-2 flex items-center gap-1.5 text-body-sm text-on-surface-variant"><Icon name="trending_up" className="text-[16px] text-primary" />Impact: {fmtMinutes(total)} → {fmtMinutes(Math.max(0, total + delta))} total today</p>}
@@ -187,7 +187,7 @@ export function NewBlockModal() {
           <div className="flex items-center gap-2 text-body-sm">
             <span className={label}>Add to</span>
             {(["today", "backlog"] as const).map((w) => (
-              <button key={w} onClick={() => setWhen(w)} className={cx("px-3 py-1 rounded-lg font-semibold", when === w ? "bg-primary-container text-on-primary" : "bg-surface-container-low text-on-surface-variant hover:bg-surface-container")}>{w === "today" ? "Today's schedule" : "Backlog"}</button>
+              <button key={w} onClick={() => setWhen(w)} className={cx("px-3 py-1 rounded-lg font-semibold", when === w ? "bg-primary-container text-on-primary-container" : "bg-surface-container-low text-on-surface-variant hover:bg-surface-container")}>{w === "today" ? "Today's schedule" : "Backlog"}</button>
             ))}
           </div>
         </div>

@@ -4,6 +4,8 @@ import { api } from "@/lib/api";
 import { useAuth } from "@/hooks/useAuth";
 import { useAiStatus } from "@/hooks/useAiStatus";
 import { useToast } from "@/components/Toast";
+import { useTheme } from "@/hooks/useTheme";
+import type { ThemePref } from "@/lib/types";
 import { Icon } from "@/components/Icon";
 import { cx, downloadFile, errMsg, LANGUAGES } from "@/lib/utils";
 
@@ -29,6 +31,7 @@ export default function Settings() {
   const [bin, setBin] = useState(user?.preferences.binaural_enabled ?? false);
   const [model, setModel] = useState(user?.preferences.ai_model ?? "");
   const [hints, setHints] = useState(user?.preferences.ai_hints ?? true);
+  const { pref: themePref, setPref: setTheme } = useTheme();
   const [busy, setBusy] = useState("");
   const [pw, setPw] = useState({ cur: "", next: "", again: "" });
   const [del, setDel] = useState({ open: false, password: "" });
@@ -64,6 +67,19 @@ export default function Settings() {
   return (
     <div className="max-w-3xl mx-auto p-4 sm:p-8 flex flex-col gap-5">
       <div><h1 className="font-headline-lg text-headline-lg">Settings</h1><p className="text-on-surface-variant">{user.email}{user.is_demo && " · demo account"}</p></div>
+
+      <Card title="Appearance" icon="palette">
+        <p className="text-on-surface-variant mb-3">Light is the default. Pick what's comfortable — it applies everywhere and is remembered on your account.</p>
+        <div role="radiogroup" aria-label="Theme" className="grid grid-cols-3 gap-3">
+          {([["light", "Light", "light_mode"], ["dark", "Dark", "dark_mode"], ["system", "System", "contrast"]] as [ThemePref, string, string][]).map(([k, label, icon]) => (
+            <button key={k} role="radio" aria-checked={themePref === k} onClick={() => setTheme(k)}
+              className={cx("rounded-xl border p-3 flex flex-col items-center gap-1.5 font-semibold transition-colors",
+                themePref === k ? "border-primary bg-primary-fixed/50 text-on-surface ring-2 ring-primary/30" : "border-outline-variant hover:bg-surface-container")}>
+              <Icon name={icon} className="text-[22px]" />{label}
+              {themePref === k && <span className="font-label-micro text-label-micro text-primary uppercase">Active</span>}
+            </button>))}
+        </div>
+      </Card>
 
       <Card title="Profile & planning" icon="person">
         <div className="grid sm:grid-cols-2 gap-4">

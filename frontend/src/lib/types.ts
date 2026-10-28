@@ -2,7 +2,8 @@
 export type TaskMode = "CODE" | "PROSE" | "THEORY" | "SPEECH";
 export type TaskStatus = "pending" | "completed";
 
-export interface UserPreferences { day_start: string; binaural_enabled: boolean; default_language: string; ai_model: string | null; ai_hints: boolean }
+export type ThemePref = "light" | "dark" | "system";
+export interface UserPreferences { day_start: string; binaural_enabled: boolean; default_language: string; ai_model: string | null; ai_hints: boolean; theme: ThemePref }
 export interface User {
   id: string; name: string; email: string; created_at: string; streak_count: number; longest_streak: number;
   daily_target_minutes: number; xp: number; is_demo: boolean; preferences: UserPreferences;
@@ -22,7 +23,7 @@ export interface Task {
   starter_code: string; test_cases: TestCaseIO[]; word_target_min: number | null; word_target_max: number | null;
   target_wpm: number | null; draft: Draft | null; time_spent_seconds: number; completed_at: string | null;
   journal_id: string | null; content_ready: boolean; start_time: string | null; end_time: string | null;
-  plan_id: string | null; topic_key: string | null; phase: string | null; plan_day: number | null; hint_level_used: number;
+  plan_id: string | null; topic_key: string | null; phase: string | null; plan_day: number | null; hint_level_used: number; plan_name?: string | null; plan_color?: number | null;
   practice_kind: "INTERVIEW" | "ENGLISH" | null; practice_config: Record<string, unknown>;
 }
 
@@ -114,8 +115,18 @@ export interface FlashcardStats { total: number; due: number; by_box: Record<str
 
 
 // ───────── learning paths ─────────
-export type Track = "DSA" | "INTERVIEW" | "ENGLISH";
+export type Track = "DSA" | "SUBJECT" | "INTERVIEW" | "ENGLISH";
+export interface OutlineExercise { title: string; difficulty: "Easy" | "Medium" | "Hard" }
+export interface OutlineTopic { name: string; theory: string; exercises: OutlineExercise[] }
+export interface Outline { subject: string; summary: string; topics: OutlineTopic[]; left_out: string[]; reviewed: boolean }
+export interface SubjectInfo {
+  key: string; name: string; icon: string; blurb: string; group: string; kind: "dsa" | "code" | "sql" | "exercise"; featured: boolean;
+  language: string | null; note: string; has_placement: boolean; executable: boolean;
+  topics: { key: string; name: string; exercises: number; weight: number }[];
+}
+export interface SubjectCatalog { subjects: SubjectInfo[]; max_plans: number; over_budget_minutes: number }
 export interface PlanCreate {
+  subject?: string; custom_name?: string; custom_topics?: OutlineTopic[];
   track: Track; mode: "LEARN" | "PRACTICE"; days: number; minutes_per_day: number; level: Level;
   difficulty: "easy" | "medium" | "hard" | "mixed" | "adaptive"; topics: string[]; known_topics: string[]; weak_topics: string[];
   language: string; skip_weekends: boolean; start_date?: string | null;
@@ -127,11 +138,13 @@ export interface PlanPreview {
   title: string; track: Track; mode: string; days: number; minutes_per_day: number; start_date: string; end_date: string;
   topics: { key: string; name: string; days: number; first_day: number; last_day: number }[]; trimmed_topics: string[];
   total_blocks: number; total_minutes: number; by_phase: Record<string, number>; sample_days: PreviewDay[];
+  other_minutes_per_day: number; combined_minutes_per_day: number; over_budget: boolean;
 }
 export interface PlanTopic { key: string; name: string; first_day: number; last_day: number; blocks_total: number; blocks_done: number; mastery: number | null; help_requests: number; status: "done" | "current" | "upcoming" }
 export interface Plan {
   id: string; title: string; track: Track; mode: string; level: string; days: number; minutes_per_day: number; start_date: string; end_date: string;
-  difficulty: string; language: string; status: string; skip_weekends: boolean; day_index: number; days_left: number;
+  difficulty: string; language: string; status: "active" | "paused" | "completed" | "archived"; subject: string; subject_name: string; icon: string; color: number; custom: boolean;
+  skip_weekends: boolean; day_index: number; days_left: number;
   blocks_total: number; blocks_done: number; minutes_total: number; minutes_done: number; progress_pct: number;
   missed_count: number; missed_minutes: number; today_count: number; next_task_id: string | null; topics: PlanTopic[];
   trimmed_topics: string[]; rebalanced_count: number; config: Record<string, unknown>;

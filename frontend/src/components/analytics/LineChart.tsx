@@ -21,16 +21,16 @@ export function LineChart({ series }: { series: SeriesPoint[] }) {
     <div className="relative">
       <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto" role="img" aria-label="Recent sessions: minutes spent and score">
         {ticks.map((t) => (<g key={t}>
-          <line x1={PL} x2={W - PR} y1={PT + ih - t * ih} y2={PT + ih - t * ih} stroke="#dae2fd" strokeDasharray="3 4" />
-          <text x={PL - 6} y={PT + ih - t * ih + 3} textAnchor="end" fontSize="10" fill="#777587" fontFamily="JetBrains Mono">{Math.round(t * yMax)}m</text>
-          <text x={W - PR + 6} y={PT + ih - t * ih + 3} fontSize="10" fill="#006c4a" fontFamily="JetBrains Mono">{Math.round(t * 100)}</text></g>))}
-        <defs><linearGradient id="agArea" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#4f46e5" stopOpacity=".25" /><stop offset="100%" stopColor="#4f46e5" stopOpacity="0" /></linearGradient></defs>
+          <line x1={PL} x2={W - PR} y1={PT + ih - t * ih} y2={PT + ih - t * ih} stroke="rgb(var(--c-outline-variant))" strokeDasharray="3 4" />
+          <text x={PL - 6} y={PT + ih - t * ih + 3} textAnchor="end" fontSize="10" fill="rgb(var(--c-outline))" fontFamily="JetBrains Mono">{Math.round(t * yMax)}m</text>
+          <text x={W - PR + 6} y={PT + ih - t * ih + 3} fontSize="10" fill="rgb(var(--c-secondary))" fontFamily="JetBrains Mono">{Math.round(t * 100)}</text></g>))}
+        <defs><linearGradient id="agArea" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="rgb(var(--c-primary-container))" stopOpacity=".25" /><stop offset="100%" stopColor="rgb(var(--c-primary-container))" stopOpacity="0" /></linearGradient></defs>
         <path d={area} fill="url(#agArea)" />
-        <path d={line((s) => yS(s.score))} fill="none" stroke="#006c4a" strokeWidth="1.5" strokeDasharray="4 3" />
-        <path d={line((s) => yM(s.minutes))} fill="none" stroke="#4f46e5" strokeWidth="2.5" strokeLinejoin="round" />
+        <path d={line((s) => yS(s.score))} fill="none" stroke="rgb(var(--c-secondary))" strokeWidth="1.5" strokeDasharray="4 3" />
+        <path d={line((s) => yM(s.minutes))} fill="none" stroke="rgb(var(--c-primary-container))" strokeWidth="2.5" strokeLinejoin="round" />
         {series.map((s, i) => (<g key={i}>
-          <circle cx={x(i)} cy={yM(s.minutes)} r={hi === i ? 5 : 3.5} fill="#4f46e5" stroke="#fff" strokeWidth="1.5" />
-          <text x={x(i)} y={H - 8} textAnchor="middle" fontSize="10" fill={hi === i ? "#3525cd" : "#777587"} fontFamily="JetBrains Mono">{s.label}</text>
+          <circle cx={x(i)} cy={yM(s.minutes)} r={hi === i ? 5 : 3.5} fill="rgb(var(--c-primary-container))" stroke="rgb(var(--c-surface-container-lowest))" strokeWidth="1.5" />
+          <text x={x(i)} y={H - 8} textAnchor="middle" fontSize="10" fill={hi === i ? "rgb(var(--c-primary))" : "rgb(var(--c-outline))"} fontFamily="JetBrains Mono">{s.label}</text>
           <rect x={x(i) - iw / series.length / 2} y={PT} width={Math.max(14, iw / series.length)} height={ih + PB} fill="transparent" tabIndex={0}
             aria-label={`${s.label}: ${s.minutes} minutes, score ${s.score}`} onMouseEnter={() => setHi(i)} onMouseLeave={() => setHi(null)} onFocus={() => setHi(i)} onBlur={() => setHi(null)} /></g>))}
       </svg>

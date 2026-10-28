@@ -2,12 +2,12 @@ import type {
   CheckAnswerOut, CheckOut, CurriculumInfo, ExplainKind, HelpConfig, HelpOut, HintOut, Mistake, PSession, PlacementQ, PlacementResult,
   Plan, PlanCreate, PlanDay, PlanPreview, Rebalance, SessionCreate,
   AiStatus, EvaluateMeta, EvaluateOut, Flashcard, FlashcardStats, Heatmap, JournalEntry, JournalPage, Performance, Preset,
-  RunOut, RuntimeInfo, Schedule, Stats, Task, TaskContent, TaskCreate, TaskMode, TaskUpdate, TokenOut, User, UserPreferences,
+  Level, Outline, SubjectCatalog, RunOut, RuntimeInfo, Schedule, Stats, Task, TaskContent, TaskCreate, TaskMode, TaskUpdate, TokenOut, User, UserPreferences,
 } from "./types";
 
 const BASE = (import.meta.env.VITE_API_BASE_URL as string | undefined) || "";
 const TOKEN_KEY = "agama.token";
-console.log('BASE', BASE)
+
 export class ApiError extends Error {
   status: number; code?: string;
   constructor(status: number, message: string, code?: string) { super(message); this.status = status; this.code = code; }
@@ -128,6 +128,11 @@ export const api = {
     preview: (b: PlanCreate) => post<PlanPreview>("/api/plans/preview", b),
     create: (b: PlanCreate) => post<Plan>("/api/plans/", b),
     active: () => get<Plan | null>("/api/plans/active"),
+    list: () => get<Plan[]>("/api/plans/"),
+    subjects: () => get<SubjectCatalog>("/api/plans/subjects"),
+    outline: (b: { subject: string; level: Level; goal?: string; known?: string }) => post<Outline>("/api/plans/outline", b),
+    pause: (id: string) => post<Plan>(`/api/plans/${id}/pause`, {}),
+    resume: (id: string) => post<Rebalance>(`/api/plans/${id}/resume`, {}),
     days: (id: string) => get<PlanDay[]>(`/api/plans/${id}/days`),
     rebalance: (id: string, extend_days = 0) => post<Rebalance>(`/api/plans/${id}/rebalance`, { extend_days }),
     remove: (id: string) => del<void>(`/api/plans/${id}`),

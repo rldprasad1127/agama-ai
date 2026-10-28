@@ -2,16 +2,18 @@ import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "@/lib/api";
 import { Icon } from "@/components/Icon";
 import { useToast } from "@/components/Toast";
+import { useTheme } from "@/hooks/useTheme";
 import { cx, errMsg, LANGUAGES } from "@/lib/utils";
 import type { RunOut, RuntimeInfo } from "@/lib/types";
 import { Markdown } from "./Markdown";
 import type { WorkProps } from "./types";
 
 const Monaco = lazy(() => import("@monaco-editor/react"));
-const EXT: Record<string, string> = { python: "py", javascript: "js", typescript: "ts", cpp: "cpp", go: "go", rust: "rs" };
+const EXT: Record<string, string> = { python: "py", javascript: "js", typescript: "ts", cpp: "cpp", go: "go", rust: "rs", sql: "sql" };
 
 export function CodeWorkspace({ task, content, setContent, hintsUsed, setHintsUsed, language, setLanguage, metaRef }: WorkProps) {
   const { toast } = useToast();
+  const { resolved } = useTheme();
   const [tab, setTab] = useState<"objective" | "constraints" | "hints">("objective");
   const [runtimes, setRuntimes] = useState<RuntimeInfo[]>([]);
   const [running, setRunning] = useState(false);
@@ -90,27 +92,27 @@ export function CodeWorkspace({ task, content, setContent, hintsUsed, setHintsUs
         </div>
       </section>
 
-      <section className="flex flex-col min-h-0 bg-[#0b1020] text-slate-200">
-        <div className="flex items-center gap-2 px-3 py-2 bg-[#0e1428] border-b border-white/10 flex-wrap">
-          <select aria-label="Language" value={language} onChange={(e) => setLanguage(e.target.value)} className="bg-[#161d38] text-slate-200 text-label-code font-label-code rounded px-2 py-1 border border-white/10">
-            {LANGUAGES.map((l) => { const r = runtimes.find((x) => x.key === l.key); const off = !!r && !r.available; return <option key={l.key} value={l.key}>{l.label}{off ? " (not installed)" : ""}</option>; })}
+      <section className="flex flex-col min-h-0 bg-surface-container-lowest text-on-surface">
+        <div className="flex items-center gap-2 px-3 py-2 bg-surface-container-low border-b border-outline-variant flex-wrap">
+          <select aria-label="Language" disabled={language === "sql"} value={language} onChange={(e) => setLanguage(e.target.value)} className="bg-surface-container text-on-surface text-label-code font-label-code rounded px-2 py-1 border border-outline-variant">
+            {(language === "sql" ? [{ key: "sql", label: "SQL (SQLite)" }] : LANGUAGES).map((l) => { const r = runtimes.find((x) => x.key === l.key); const off = !!r && !r.available; return <option key={l.key} value={l.key}>{l.label}{off ? " (not installed)" : ""}</option>; })}
           </select>
-          <span className="font-label-code text-label-code px-2 py-1 rounded bg-[#161d38] flex items-center gap-1.5"><Icon name="code" className="text-[14px]" />solution.{EXT[language] ?? "txt"}</span>
+          <span className="font-label-code text-label-code px-2 py-1 rounded bg-surface-container flex items-center gap-1.5"><Icon name="code" className="text-[14px]" />solution.{EXT[language] ?? "txt"}</span>
           <div className="ml-auto flex items-center gap-2">
-            <button onClick={() => setShowStdin((s) => !s)} className={cx("px-2 py-1 rounded font-label-code text-label-code", showStdin ? "bg-white/15" : "hover:bg-white/10")}>stdin</button>
-            <button onClick={run} disabled={running || !canRun} title={canRun ? "Run (Ctrl/⌘+Enter)" : `${rt?.label} is not installed on the server`} className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-white/10 hover:bg-white/20 font-semibold text-body-sm disabled:opacity-50">
-              <Icon name={running ? "progress_activity" : "play_arrow"} className={cx("text-[16px] text-emerald-400", running && "animate-spin")} />{running ? "Running…" : "Run Code"}</button>
+            <button onClick={() => setShowStdin((s) => !s)} className={cx("px-2 py-1 rounded font-label-code text-label-code", showStdin ? "bg-surface-container" : "hover:bg-surface-container-high")}>stdin</button>
+            <button onClick={run} disabled={running || !canRun} title={canRun ? "Run (Ctrl/⌘+Enter)" : `${rt?.label} is not installed on the server`} className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-surface-container hover:bg-surface-container-high font-semibold text-body-sm disabled:opacity-50">
+              <Icon name={running ? "progress_activity" : "play_arrow"} className={cx("text-[16px] text-secondary", running && "animate-spin")} />{running ? "Running…" : "Run Code"}</button>
           </div>
         </div>
         <div className="flex-1 min-h-[280px] relative">
           {fallback && !mounted ? (
             <textarea aria-label="Code editor" spellCheck={false} value={content} onChange={(e) => setContent(e.target.value)}
               onKeyDown={(e) => { if ((e.ctrlKey || e.metaKey) && e.key === "Enter") { e.preventDefault(); runRef.current(); } }}
-              className="absolute inset-0 w-full h-full bg-[#0b1020] text-slate-200 font-label-code text-[13px] leading-5 p-4 outline-none resize-none" />
+              className="absolute inset-0 w-full h-full bg-surface-container-lowest text-on-surface font-label-code text-[13px] leading-5 p-4 outline-none resize-none" />
           ) : (
-            <Suspense fallback={<div className="p-4 font-label-code text-label-code text-slate-400">Loading editor…</div>}>
-              <Monaco height="100%" theme="vs-dark" language={monacoLang} value={content} onChange={(v) => setContent(v ?? "")}
-                loading={<div className="p-4 font-label-code text-label-code text-slate-400">Loading Monaco editor…</div>}
+            <Suspense fallback={<div className="p-4 font-label-code text-label-code text-on-surface-variant">Loading editor…</div>}>
+              <Monaco height="100%" theme={resolved === "dark" ? "vs-dark" : "vs"} language={monacoLang} value={content} onChange={(v) => setContent(v ?? "")}
+                loading={<div className="p-4 font-label-code text-label-code text-on-surface-variant">Loading Monaco editor…</div>}
                 onMount={(ed, monaco) => {
                   setMounted(true);
                   ed.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () => runRef.current());
@@ -120,34 +122,34 @@ export function CodeWorkspace({ task, content, setContent, hintsUsed, setHintsUs
             </Suspense>
           )}
         </div>
-        {showStdin && <textarea aria-label="Program input" value={stdin} onChange={(e) => setStdin(e.target.value)} placeholder="Standard input for “Run Code” (optional)" className="h-16 bg-[#0e1428] border-t border-white/10 px-3 py-2 font-label-code text-label-code text-slate-200 outline-none resize-none" />}
+        {showStdin && <textarea aria-label="Program input" value={stdin} onChange={(e) => setStdin(e.target.value)} placeholder="Standard input for “Run Code” (optional)" className="h-16 bg-surface-container-low border-t border-outline-variant px-3 py-2 font-label-code text-label-code text-on-surface outline-none resize-none" />}
         {(result || runError || running) && (
-          <div className="max-h-[42%] overflow-y-auto border-t border-white/10 bg-[#080c19] p-3 font-label-code text-label-code" aria-live="polite">
-            {runError && <div className="text-rose-300">{runError}</div>}
+          <div className="max-h-[42%] overflow-y-auto border-t border-outline-variant bg-surface-container-low p-3 font-label-code text-label-code" aria-live="polite">
+            {runError && <div className="text-error">{runError}</div>}
             {result && (
               <>
-                <div className="flex items-center gap-3 text-slate-400 mb-2 flex-wrap">
+                <div className="flex items-center gap-3 text-on-surface-variant mb-2 flex-wrap">
                   <span>exit {result.exit_code ?? "—"}</span><span>{result.duration_ms} ms</span>
-                  {result.timed_out && <span className="text-amber-300">⏱ TIME LIMIT</span>}
-                  {result.tests_total > 0 && <span className={cx("px-2 rounded", result.tests_passed === result.tests_total ? "bg-emerald-500/20 text-emerald-300" : "bg-amber-500/20 text-amber-300")}>{result.tests_passed}/{result.tests_total} tests passed</span>}
+                  {result.timed_out && <span className="text-tertiary">⏱ TIME LIMIT</span>}
+                  {result.tests_total > 0 && <span className={cx("px-2 rounded", result.tests_passed === result.tests_total ? "bg-secondary/20 text-secondary" : "bg-tertiary/20 text-tertiary")}>{result.tests_passed}/{result.tests_total} tests passed</span>}
                 </div>
-                {result.stdout && <pre className="whitespace-pre-wrap text-slate-200">{result.stdout}</pre>}
-                {result.stderr && <pre className="whitespace-pre-wrap text-rose-300">{result.stderr}</pre>}
+                {result.stdout && <pre className="whitespace-pre-wrap text-on-surface">{result.stdout}</pre>}
+                {result.stderr && <pre className="whitespace-pre-wrap text-error">{result.stderr}</pre>}
                 {result.tests.length > 0 && (
-                  <table className="w-full mt-2 text-left"><thead className="text-slate-500"><tr><th className="py-1 pr-2">Test</th><th className="pr-2">Call</th><th className="pr-2">Expected</th><th className="pr-2">Actual</th><th /></tr></thead>
+                  <table className="w-full mt-2 text-left"><thead className="text-outline"><tr><th className="py-1 pr-2">Test</th><th className="pr-2">Call</th><th className="pr-2">Expected</th><th className="pr-2">Actual</th><th /></tr></thead>
                     <tbody>{result.tests.map((t, i) => (
-                      <tr key={i} className="border-t border-white/5 align-top"><td className="py-1 pr-2">{t.name}</td><td className="pr-2 text-slate-400 break-all">{t.call}</td><td className="pr-2">{t.expected}</td>
-                        <td className={cx("pr-2 break-all", t.passed ? "text-slate-300" : "text-rose-300")}>{t.error ?? t.actual ?? "—"}</td>
-                        <td className={t.passed ? "text-emerald-400" : "text-rose-400"}>{t.passed ? "✓" : "✗"}</td></tr>))}</tbody></table>
+                      <tr key={i} className="border-t border-outline-variant align-top"><td className="py-1 pr-2">{t.name}</td><td className="pr-2 text-on-surface-variant break-all">{t.call}</td><td className="pr-2">{t.expected}</td>
+                        <td className={cx("pr-2 break-all", t.passed ? "text-on-surface-variant" : "text-error")}>{t.error ?? t.actual ?? "—"}</td>
+                        <td className={t.passed ? "text-secondary" : "text-error"}>{t.passed ? "✓" : "✗"}</td></tr>))}</tbody></table>
                 )}
-                {!result.stdout && !result.stderr && !result.tests.length && <span className="text-slate-500">(no output)</span>}
+                {!result.stdout && !result.stderr && !result.tests.length && <span className="text-outline">(no output)</span>}
               </>
             )}
           </div>
         )}
-        <div className="flex items-center justify-between px-3 py-1.5 bg-[#0e1428] border-t border-white/10 font-label-code text-label-code text-slate-400">
+        <div className="flex items-center justify-between px-3 py-1.5 bg-surface-container-low border-t border-outline-variant font-label-code text-label-code text-on-surface-variant">
           <span>Ln {cursor.ln}, Col {cursor.col} &nbsp;|&nbsp; Spaces: 4 &nbsp;|&nbsp; UTF-8</span>
-          <span className="flex items-center gap-1.5"><span className={cx("w-1.5 h-1.5 rounded-full", canRun ? "bg-emerald-400" : "bg-amber-400")} />{rt ? (rt.available ? `${rt.label} runner ready` : "runner unavailable") : "…"}</span>
+          <span className="flex items-center gap-1.5"><span className={cx("w-1.5 h-1.5 rounded-full", canRun ? "bg-secondary" : "bg-tertiary")} />{rt ? (rt.available ? `${rt.label} runner ready` : "runner unavailable") : "…"}</span>
         </div>
       </section>
     </div>

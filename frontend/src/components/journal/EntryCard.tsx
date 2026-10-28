@@ -79,13 +79,13 @@ function Snapshot({ e, toast }: { e: JournalEntry; toast: (m: string, k?: "succe
   if (e.task_mode === "CODE") {
     const lines = e.user_submission.replace(/\n$/, "").split("\n");
     return (
-      <div className="rounded-lg overflow-hidden border border-outline-variant/50 bg-[#0b1020]">
-        <div className="flex items-center justify-between px-3 py-1.5 bg-[#131a33] text-slate-300 font-label-micro text-label-micro">
+      <div className="rounded-lg overflow-hidden border border-outline-variant/50 bg-surface-container-lowest">
+        <div className="flex items-center justify-between px-3 py-1.5 bg-surface-container-low text-on-surface-variant font-label-micro text-label-micro">
           <span>SUBMISSION SNAPSHOT · {e.language ?? "code"}</span>
-          <button className="inline-flex items-center gap-1 hover:text-white" onClick={() => copyText(e.user_submission, "Code copied.", toast)}><Icon name="content_copy" className="text-[14px]" />Copy Code</button>
+          <button className="inline-flex items-center gap-1 hover:text-on-surface" onClick={() => copyText(e.user_submission, "Code copied.", toast)}><Icon name="content_copy" className="text-[14px]" />Copy Code</button>
         </div>
-        <pre className="max-h-80 overflow-auto py-2 text-[12.5px] leading-5 font-label-code text-slate-100">
-          {lines.map((l, i) => (<div key={i} className="flex"><span className="w-10 shrink-0 text-right pr-3 text-slate-500 select-none tabular">{i + 1}</span><code className="whitespace-pre pr-3">{l || " "}</code></div>))}
+        <pre className="max-h-80 overflow-auto py-2 text-[12.5px] leading-5 font-label-code text-on-surface">
+          {lines.map((l, i) => (<div key={i} className="flex"><span className="w-10 shrink-0 text-right pr-3 text-outline select-none tabular">{i + 1}</span><code className="whitespace-pre pr-3">{l || " "}</code></div>))}
         </pre>
       </div>
     );

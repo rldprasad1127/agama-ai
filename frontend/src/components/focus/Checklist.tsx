@@ -20,7 +20,7 @@ export function Checklist({ title, items, done, onChange, tone = "primary" }: {
               <label className="flex items-start gap-3 px-2 py-1.5 rounded-lg hover:bg-surface-container-low cursor-pointer">
                 <input type="checkbox" checked={on} onChange={() => toggle(i)} className="peer sr-only" />
                 <span className={cx("mt-0.5 w-4 h-4 rounded-[3px] border-[1.5px] flex items-center justify-center shrink-0 peer-focus-visible:ring-2 ring-primary-container",
-                  on ? "bg-primary-container border-primary-container text-on-primary" : "border-outline-variant bg-surface-container-lowest")}>
+                  on ? "bg-primary-container border-primary-container text-on-primary-container" : "border-outline-variant bg-surface-container-lowest")}>
                   {on && <Icon name="check" className="text-[14px]" />}
                 </span>
                 <span className={cx("text-body-md", on && "line-through text-on-surface-variant", tone === "secondary" && !on && "text-on-surface")}>{it}</span>

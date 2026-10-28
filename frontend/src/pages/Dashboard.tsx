@@ -7,7 +7,7 @@ import { useAiStatus } from "@/hooks/useAiStatus";
 import { Icon } from "@/components/Icon";
 import { PlanBanner } from "@/components/paths/PlanBanner";
 import { useToast } from "@/components/Toast";
-import { MODES, MODE_META, cx, errMsg, fmtMinutes, greeting } from "@/lib/utils";
+import { MODES, MODE_META, cx, errMsg, fmtMinutes, greeting, planColor } from "@/lib/utils";
 import type { FlashcardStats, Preset, Task } from "@/lib/types";
 
 const QUOTES = [
@@ -123,7 +123,7 @@ export default function Dashboard() {
             </div>
             <button onClick={() => openNewBlock()} className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-surface-container-low text-on-surface hover:bg-surface-container shadow-sm font-semibold">
               <Icon name="add_circle" className="text-[18px] text-primary" />Add Task</button>
-            <button disabled={!nextId} onClick={() => nextId && nav(`/focus/${nextId}`)} className="relative inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-on-primary hover:bg-primary-container shadow-md font-semibold disabled:opacity-50 disabled:cursor-not-allowed">
+            <button disabled={!nextId} onClick={() => nextId && nav(`/focus/${nextId}`)} className="relative inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-on-primary hover:brightness-110 shadow-md font-semibold disabled:opacity-50 disabled:cursor-not-allowed">
               <Icon name="play_arrow" fill className="text-[20px]" />{nextId ? `Start Session (${fmtMinutes(schedule.remaining_minutes)})` : "No pending blocks"}</button>
           </div>
         </div>
@@ -154,7 +154,7 @@ export default function Dashboard() {
                   onDragOver={(e) => { e.preventDefault(); setOverId(t.id); }} onDrop={() => drop(t.id)}
                   className={cx("group relative flex items-center justify-between gap-3 p-space-md rounded-xl bg-surface-container-lowest shadow-sm hover:shadow-md transition-all border",
                     isNext ? "border-primary-container border-2" : "border-transparent hover:border-surface-variant", dragId === t.id && "opacity-40", overId === t.id && dragId && dragId !== t.id && "ring-2 ring-primary-container/40")}>
-                  {isNext && <span className="absolute -top-2.5 left-14 px-2 py-0.5 rounded bg-primary-container text-on-primary font-label-micro text-label-micro uppercase flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-secondary-fixed" />Next Up</span>}
+                  {isNext && <span className="absolute -top-2.5 left-14 px-2 py-0.5 rounded bg-primary-container text-on-primary-container font-label-micro text-label-micro uppercase flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-secondary-fixed" />Next Up</span>}
                   <div className="flex items-center gap-3 min-w-0 flex-1">
                     <span className="cursor-grab text-outline hover:text-on-surface-variant" title="Drag to reorder"><Icon name="drag_indicator" /></span>
                     <button onClick={() => toggleDone(t)} disabled={busy === `s${t.id}`} aria-label={done ? "Mark as pending" : "Mark as completed"} title={done ? "Mark as pending" : "Mark complete without AI review"}
@@ -165,6 +165,7 @@ export default function Dashboard() {
                       <div className="flex items-center gap-2 flex-wrap">
                         <h3 className={cx("font-headline-sm text-headline-sm", done && "line-through text-on-surface-variant")}>{t.title}</h3>
                         <span className={cx("px-2 py-0.5 rounded font-label-micro text-label-micro", m.chip)}>{m.label}{t.task_mode === "CODE" && t.language ? `: ${t.language}` : ""}</span>
+                        {t.plan_name && <span className={cx("px-2 py-0.5 rounded font-label-micro text-label-micro inline-flex items-center gap-1", planColor(t.plan_color).chip)}><span className={cx("w-1.5 h-1.5 rounded-full", planColor(t.plan_color).dot)} />{t.plan_name}</span>}
                         <span className="font-label-code text-label-code text-primary">{t.start_time} - {t.end_time}</span>
                         {done && <span className="font-label-micro text-label-micro text-secondary uppercase">Completed</span>}
                         {!t.content_ready && !done && <span className="font-label-micro text-label-micro text-tertiary uppercase px-1.5 py-0.5 rounded bg-tertiary-fixed">AI preps on start</span>}
@@ -180,7 +181,7 @@ export default function Dashboard() {
                         <button aria-label="Extend by 5 minutes" disabled={busy === `d${t.id}`} onClick={() => changeDuration(t, 5)} className="px-2 py-1 hover:bg-surface-container rounded-r-lg">+</button>
                       </div>
                     ) : <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-surface-container-low font-label-code text-label-code"><Icon name="lock" className="text-[14px]" />{t.duration_minutes}m</span>}
-                    {!done && <Link to={`/focus/${t.id}`} className={cx("inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-semibold text-body-sm", isNext ? "bg-primary text-on-primary hover:bg-primary-container" : "bg-surface-container text-on-surface hover:bg-surface-container-high")}><Icon name="timer" className="text-[16px]" />Focus</Link>}
+                    {!done && <Link to={`/focus/${t.id}`} className={cx("inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-semibold text-body-sm", isNext ? "bg-primary text-on-primary hover:brightness-110" : "bg-surface-container text-on-surface hover:bg-surface-container-high")}><Icon name="timer" className="text-[16px]" />Focus</Link>}
                     {done && <Link to="/journal" className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-surface-container text-on-surface font-semibold text-body-sm hover:bg-surface-container-high"><Icon name="menu_book" className="text-[16px]" />Review</Link>}
                     <div className="relative">
                       <button aria-label="Block options" onClick={(e) => { e.stopPropagation(); setMenuFor(menuFor === t.id ? null : t.id); }} className="p-1 rounded hover:bg-surface-container text-on-surface-variant"><Icon name="more_vert" /></button>
@@ -256,11 +257,11 @@ export default function Dashboard() {
             </div>
           </Panel>
 
-          <div className="rounded-xl bg-primary-container text-on-primary p-space-md shadow-sm">
+          <div className="rounded-xl bg-primary-container text-on-primary-container p-space-md shadow-sm">
             <div className="flex items-center justify-between"><span className="font-label-micro text-label-micro uppercase tracking-wider text-on-primary-container">Focus Mode</span><Icon name="visibility_off" className="text-[18px]" /></div>
             <h3 className="font-headline-sm mt-2">Distraction-Free Zen Mode</h3>
             <p className="text-body-sm text-on-primary-container mt-1">Full-screen workspace with timer, binaural audio and autosave. Starts your next pending block.</p>
-            <button disabled={!nextId} onClick={() => nextId && nav(`/focus/${nextId}`)} className="mt-3 w-full py-2 rounded-lg bg-white text-primary font-semibold flex items-center justify-center gap-2 disabled:opacity-60"><Icon name="fullscreen" className="text-[18px]" />Engage Zen Focus</button>
+            <button disabled={!nextId} onClick={() => nextId && nav(`/focus/${nextId}`)} className="mt-3 w-full py-2 rounded-lg bg-surface-container-lowest text-primary font-semibold flex items-center justify-center gap-2 disabled:opacity-60"><Icon name="fullscreen" className="text-[18px]" />Engage Zen Focus</button>
           </div>
 
           <figure className="rounded-xl bg-surface-container-lowest shadow-sm p-space-md">

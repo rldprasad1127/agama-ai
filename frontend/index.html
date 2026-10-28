@@ -5,6 +5,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <title>Agama AI</title>
+    <meta name="color-scheme" content="light dark" />
+    <script>
+      /* apply the saved theme before first paint (light unless the learner chose otherwise) */
+      (function () {
+        try {
+          var p = localStorage.getItem("agama.theme") || "light";
+          var dark = p === "dark" || (p === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+          if (dark) document.documentElement.classList.add("dark");
+        } catch (e) {}
+      })();
+    </script>
   </head>
   <body class="bg-surface font-body-md text-on-surface antialiased">
     <div id="root"></div>

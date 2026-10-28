@@ -156,6 +156,9 @@ def _user_prompt(
                     parts.append(f"  FAILED {t.name}: {t.call} expected {t.expected}, got {t.actual or t.error}\n")
                 if run.timed_out:
                     parts.append("  A run hit the time limit (possible infinite loop / bad complexity).\n")
+            if run is not None and not run.tests_total:
+                parts.append(f"PROGRAM OUTPUT (exit {run.exit_code}):\n{_clip(run.stdout or '(none)', 3000)}\n"
+                             + (f"ERRORS:\n{_clip(run.stderr, 1500)}\n" if run.stderr else ""))
             if meta.hints_used:
                 parts.append(f"Hints the learner opened: {meta.hints_used}\n")
             parts.append(f"\n<submission>\n{_clip(submission)}\n</submission>")
@@ -165,6 +168,10 @@ def _user_prompt(
                 f"TARGET LENGTH: {task.word_target_min}-{task.word_target_max} words\n"
                 if task.word_target_min and task.word_target_max else ""
             )
+            if task.plan_id is not None:          # PROSE blocks inside a plan are hands-on exercises (Excel, Power BI, custom…)
+                head += ("THIS IS A HANDS-ON TECHNICAL EXERCISE, NOT CREATIVE WRITING. Judge whether the answer is correct and complete against "
+                         "the brief and the mandatory points; ignore literary style. Report tone as the answer's approach (e.g. 'Formula-based'), "
+                         "pacing as 'n/a', voice_texture as 'Practical'. technical_accuracy is the main driver of the score.\n\n")
             return (
                 head + rng + _fmt_list("MANDATORY BEATS / INVARIANTS", task.checklist)
                 + f"MEASURED: {det['word_count']} words, Flesch-Kincaid grade {det.get('grade')}, "
@@ -399,6 +406,19 @@ Choose a word range achievable in the available time (about 12-18 words per minu
 }
 The script must be speakable within the planned duration.""",
         }
+        if mode == TaskMode.CODE and lang == "sql":
+            shapes[TaskMode.CODE] = f"""{{
+  "description": "one sentence summary",
+  "difficulty": "Easy|Medium|Hard",
+  "tags": ["short", "tags"],
+  "prompt_context": "Markdown task: a '### Task' section, the table descriptions, and the expected result described in words/small table",
+  "constraints": ["e.g. SQLite syntax, return columns x and y, sorted by ..."],
+  "hints": ["2-3 progressive hints, least to most revealing"],
+  "starter_code": "SQLite CREATE TABLE and INSERT statements for small sample data (5-10 rows per table), then a line '-- Write your query below'. NO solution.",
+  "test_cases": [],
+  "reference_solution": "the correct SQL query"
+}}
+test_cases must be an empty list. Fit the task to roughly {duration_minutes} minutes."""
         system = (
             "You are an expert curriculum designer creating a focused practice session. "
             f"Return ONLY one valid JSON object with exactly this shape:\n{shapes[mode]}\n\n"

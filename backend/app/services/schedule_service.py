@@ -6,6 +6,7 @@ from typing import Optional
 
 from app.models.enums import TaskMode, TaskStatus
 from app.models.schemas import PresetBlock, PresetOut, ScheduleOut, TaskOut, task_to_out
+from app.models.learning import LearningPlan
 from app.models.task import TaskBlock
 from app.models.user import User
 
@@ -41,6 +42,13 @@ async def day_tasks(user: User, date: dt.date) -> list[TaskBlock]:
 async def build_schedule(user: User, date: dt.date) -> ScheduleOut:
     tasks = await day_tasks(user, date)
     outs = annotate_times(tasks, user.preferences.day_start)
+    plan_ids = {t.plan_id for t in tasks if t.plan_id}
+    if plan_ids:
+        plans = {p.id: p for p in await LearningPlan.find({"_id": {"$in": list(plan_ids)}}).to_list()}
+        for t, o in zip(tasks, outs):
+            p = plans.get(t.plan_id) if t.plan_id else None
+            if p:
+                o.plan_name, o.plan_color = (p.subject_name or p.title), p.color
     total = sum(t.duration_minutes for t in tasks)
     done = [t for t in tasks if t.status == TaskStatus.COMPLETED]
     done_min = sum(t.duration_minutes for t in done)

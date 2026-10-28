@@ -20,6 +20,7 @@ class PlanTopic(BaseModel):
     days: int = 1
     first_day: int = 1            # 1-based plan day on which the topic starts
     last_day: int = 1
+    priority: int = 0             # 1 = keep first when the schedule is squeezed (0 = unknown)
 
 
 class TopicStat(BaseModel):
@@ -33,7 +34,13 @@ class TopicStat(BaseModel):
 
 class LearningPlan(Document):
     user_id: PydanticObjectId
-    track: str = "DSA"                       # DSA | INTERVIEW | ENGLISH
+    track: str = "DSA"                       # DSA | SUBJECT | INTERVIEW | ENGLISH
+    subject: str = "dsa"                     # catalog key, "custom", "interview" or "english"
+    subject_name: str = ""
+    icon: str = "school"
+    color: int = 0                           # index into the UI's plan colour palette
+    custom: bool = False                     # AI-drafted syllabus (unreviewed)
+    paused_at: Optional[dt.datetime] = None
     mode: str = "LEARN"                      # LEARN | PRACTICE
     title: str = ""
     level: str = "beginner"
@@ -48,7 +55,7 @@ class LearningPlan(Document):
     trimmed_topics: list[str] = Field(default_factory=list)   # topics left out because the time was too short
     config: dict[str, Any] = Field(default_factory=dict)      # track-specific options (role, topic, level…)
     topic_stats: dict[str, TopicStat] = Field(default_factory=dict)
-    status: str = "active"                   # active | completed | archived
+    status: str = "active"                   # active | paused | completed | archived
     rebalanced_count: int = 0
     created_at: dt.datetime = Field(default_factory=_now)
 

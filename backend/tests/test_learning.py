@@ -129,11 +129,13 @@ async def test_create_plan_schedules_blocks_and_updates_profile(client, auth):
     assert me["onboarded"] and me["goal"] == "dsa" and me["daily_target_minutes"] == 60
     days = (await client.get(f"/api/plans/{plan['id']}/days")).json()
     assert len(days) == 14 and days[0]["is_today"] and days[0]["day"] == 1
-    # creating another plan archives the first and removes its pending blocks
+    # creating another plan leaves the first one fully intact (plans run side by side)
     r2 = await client.post("/api/plans/", json={**BODY, "days": 7, "mode": "PRACTICE", "level": "advanced"})
     assert r2.status_code == 201
-    assert (await client.get("/api/plans/active")).json()["id"] == r2.json()["id"]
-    assert (await client.get(f"/api/plans/{plan['id']}/days")).json() == []
+    listed = (await client.get("/api/plans/")).json()
+    assert {p["id"] for p in listed} == {plan["id"], r2.json()["id"]} and all(p["status"] == "active" for p in listed)
+    assert len((await client.get(f"/api/plans/{plan['id']}/days")).json()) == 14
+    assert (await client.get("/api/auth/me")).json()["daily_target_minutes"] == 120
 
 
 async def test_plan_isolated_between_users(client, auth):

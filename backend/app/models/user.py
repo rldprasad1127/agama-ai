@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import datetime as dt
-from typing import Optional
+from typing import Literal, Optional
 
 from beanie import Document, Indexed
 from pydantic import BaseModel, Field
@@ -14,6 +14,7 @@ class UserPreferences(BaseModel):
     default_language: str = "python"
     ai_model: Optional[str] = None    # overrides OLLAMA_MODEL for this user
     ai_hints: bool = True             # escalating AI hints while coding / AI help panel
+    theme: Literal["light", "dark", "system"] = "light"   # light is the default for everyone
 
 
 class User(Document):

@@ -7,8 +7,37 @@ from typing import Any, Literal, Optional
 from pydantic import BaseModel, Field
 
 
+class OutlineExercise(BaseModel):
+    title: str = Field(max_length=120)
+    difficulty: Literal["Easy", "Medium", "Hard"] = "Medium"
+
+
+class OutlineTopic(BaseModel):
+    name: str = Field(max_length=80)
+    theory: str = Field(default="", max_length=600)
+    exercises: list[OutlineExercise] = Field(default_factory=list, max_length=6)
+
+
+class OutlineIn(BaseModel):
+    subject: str = Field(min_length=2, max_length=60)
+    level: Literal["beginner", "intermediate", "advanced"] = "beginner"
+    goal: str = Field(default="", max_length=200)          # e.g. "build dashboards for my job"
+    known: str = Field(default="", max_length=200)         # what the learner already knows
+
+
+class OutlineOut(BaseModel):
+    subject: str
+    summary: str
+    topics: list[OutlineTopic]
+    left_out: list[str] = Field(default_factory=list)      # topics dropped because the AI went over the limit
+    reviewed: bool = False
+
+
 class PlanCreate(BaseModel):
-    track: Literal["DSA", "INTERVIEW", "ENGLISH"] = "DSA"
+    track: Literal["DSA", "SUBJECT", "INTERVIEW", "ENGLISH"] = "DSA"
+    subject: str = Field(default="", max_length=40)         # SUBJECT: catalog key, or "custom"
+    custom_name: str = Field(default="", max_length=60)     # SUBJECT + custom
+    custom_topics: list[OutlineTopic] = Field(default_factory=list, max_length=12)
     mode: Literal["LEARN", "PRACTICE"] = "LEARN"
     days: int = Field(default=30, ge=3, le=120)
     minutes_per_day: int = Field(default=60, ge=15, le=240)
@@ -56,6 +85,9 @@ class PlanPreview(BaseModel):
     total_minutes: int
     by_phase: dict[str, int]
     sample_days: list[PreviewDay]
+    other_minutes_per_day: int = 0        # daily minutes of the user's other active plans
+    combined_minutes_per_day: int = 0
+    over_budget: bool = False             # combined load is above a sustainable daily amount
 
 
 class PlanTopicOut(BaseModel):
@@ -83,6 +115,11 @@ class PlanOut(BaseModel):
     difficulty: str
     language: str
     status: str
+    subject: str = "dsa"
+    subject_name: str = ""
+    icon: str = "school"
+    color: int = 0
+    custom: bool = False
     skip_weekends: bool
     day_index: int                  # today's 1-based day in the plan (0 = not started, >days = past the end)
     days_left: int

@@ -87,6 +87,11 @@ async def evaluate(task_id: str, body: EvaluateIn, user: CurrentUser, today: Cli
             if run_result.tests_total == 0 or (run_result.exit_code is None and not run_result.tests):
                 run_result = None  # runner unavailable — let the LLM judge on its own
 
+    elif task.task_mode == TaskMode.CODE and code_runner.normalise_language(language) == "sql" and language:
+        run_result = await code_runner.run_code(submission, "sql", "")
+        if run_result.exit_code is None:
+            run_result = None
+
     # 2) LLM evaluation (raises AIServiceError -> 4xx/5xx with a clear message; nothing is saved)
     metrics = await get_evaluator().evaluate(
         task, submission, time_spent_seconds=seconds, language=language, meta=body.meta, run=run_result,

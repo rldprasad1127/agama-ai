@@ -61,6 +61,7 @@ class PreferencesUpdate(BaseModel):
     default_language: Optional[str] = None
     ai_model: Optional[str] = None
     ai_hints: Optional[bool] = None
+    theme: Optional[Literal["light", "dark", "system"]] = None
 
 
 class UserUpdate(BaseModel):
@@ -200,6 +201,8 @@ class TaskOut(BaseModel):
     topic_key: Optional[str] = None
     phase: Optional[str] = None
     plan_day: Optional[int] = None
+    plan_name: Optional[str] = None       # filled on the daily schedule so blocks of different plans can be told apart
+    plan_color: Optional[int] = None
     hint_level_used: int = 0
     practice_kind: Optional[str] = None
     practice_config: dict = Field(default_factory=dict)

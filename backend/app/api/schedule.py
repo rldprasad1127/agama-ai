@@ -30,7 +30,7 @@ async def get_today(user: CurrentUser, today: ClientToday, date: Optional[dt.dat
 
 @router.get("/backlog", response_model=list[TaskOut])
 async def get_backlog(user: CurrentUser) -> list[TaskOut]:
-    tasks = await TaskBlock.find(TaskBlock.user_id == user.id, TaskBlock.date == None).sort("+created_at").to_list()  # noqa: E711
+    tasks = await TaskBlock.find(TaskBlock.user_id == user.id, TaskBlock.date == None, TaskBlock.plan_id == None).sort("+created_at").to_list()  # noqa: E711
     return [task_to_out(t) for t in tasks]
 
 

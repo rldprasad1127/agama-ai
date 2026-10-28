@@ -9,6 +9,7 @@ from typing import Optional
 
 from app.models.enums import TaskMode
 from app.services.curriculum import DSA, DSA_BY_KEY, Problem, Topic
+from app.services.subjects import DSA_SUBJECT, Subject
 
 DIFF_RANK = {"Easy": 0, "Medium": 1, "Hard": 2}
 DEFAULT_MIN = {"Easy": 25, "Medium": 35, "Hard": 50}
@@ -111,53 +112,79 @@ def _ordered_problems(topic: Topic, pref: str, level: str, mode: str) -> list[Pr
     return probs
 
 
-def _problem_block(day: int, topic: Topic, p: Problem, minutes: int, language: str, phase: str = "practice") -> PlannedBlock:
+def _practice_hint(sub: Subject, topic: Topic, p: Problem) -> str:
+    base = f"Author the {'classic problem' if sub.kind == 'dsa' else 'exercise'} \"{p.title}\" ({p.difficulty}) for a learner studying {topic.name}"
+    if sub.kind == "dsa":
+        return f"{base}. Use clear plain-language wording. {p.note}".strip()
+    return (f"{base} in {sub.name}. Use clear plain-language wording. {p.note} {_KIND_RULES.get(sub.kind, '')}").strip()
+
+
+_KIND_RULES = {
+    "sql": ("SQLite syntax. starter_code = the CREATE TABLE and INSERT statements for the sample data (max 3 tables, 5-10 rows each) "
+            "followed by the comment '-- Write your query below'. reference_solution = the correct query. test_cases must be an empty list."),
+    "exercise": ("This is a hands-on written exercise: the learner types their answer (steps, formulas, queries or code) into the answer box. "
+                 "Put the scenario and any small sample data (as a markdown table) in prompt_context; make the checklist 3-5 things a correct answer must contain; "
+                 "word_target_min/max between 40 and 250."),
+}
+
+
+def _cache(sub: Subject, tail: str) -> Optional[str]:
+    return None if sub.custom else f"{sub.key}:{tail}"
+
+
+def _problem_block(day: int, topic: Topic, p: Problem, minutes: int, language: str, phase: str = "practice", sub: Subject = DSA_SUBJECT) -> PlannedBlock:
+    lang_part = f":{language}" if sub.practice_mode == TaskMode.CODE else ""
     return PlannedBlock(
-        day=day, title=p.title, mode=TaskMode.CODE, minutes=minutes, phase=phase, category=topic.name,
-        topic_key=topic.key, difficulty=p.difficulty, tags=[topic.name],
-        gen_hint=(f"Author the classic problem \"{p.title}\" ({p.difficulty}) for a learner studying {topic.name}. "
-                  f"Use clear plain-language wording. {p.note}").strip(),
-        cache_key=f"dsa:code:{slug(p.title)}:{language}:{p.difficulty}",
+        day=day, title=p.title, mode=sub.practice_mode, minutes=minutes, phase=phase, category=topic.name,
+        topic_key=topic.key, difficulty=p.difficulty, tags=[topic.name] + (["exercise"] if sub.practice_mode == TaskMode.PROSE else []),
+        gen_hint=_practice_hint(sub, topic, p),
+        cache_key=_cache(sub, f"{'code' if sub.kind == 'dsa' else 'ex'}:{slug(p.title)}{lang_part}:{p.difficulty}"),
     )
 
 
-def _fresh_problem(day: int, topic: Topic, k: int, diff: str, minutes: int, language: str) -> PlannedBlock:
+def _fresh_problem(day: int, topic: Topic, k: int, diff: str, minutes: int, language: str, sub: Subject = DSA_SUBJECT) -> PlannedBlock:
+    lang_part = f":{language}" if sub.practice_mode == TaskMode.CODE else ""
+    noun = "problem" if sub.kind in ("dsa", "code") else "exercise"
     return PlannedBlock(
-        day=day, title=f"{topic.name}: Practice Set {k}", mode=TaskMode.CODE, minutes=minutes, phase="practice",
-        category=topic.name, topic_key=topic.key, difficulty=diff, tags=[topic.name],
-        gen_hint=f"Invent ONE fresh {diff} problem on {topic.name} that is NOT one of: "
-                 f"{', '.join(p.title for p in topic.problems)}. {topic.problems[0].note if topic.problems else ''}".strip(),
-        cache_key=f"dsa:fresh:{topic.key}:{k}:{diff}:{language}",
+        day=day, title=f"{topic.name}: Practice Set {k}", mode=sub.practice_mode, minutes=minutes, phase="practice",
+        category=topic.name, topic_key=topic.key, difficulty=diff, tags=[topic.name] + (["exercise"] if sub.practice_mode == TaskMode.PROSE else []),
+        gen_hint=(f"Invent ONE fresh {diff} {noun} on {topic.name}"
+                  + (f" in {sub.name}" if sub.kind != "dsa" else "")
+                  + f" that is NOT one of: {', '.join(p.title for p in topic.problems)}. "
+                  f"{topic.problems[0].note if topic.problems else ''} {_KIND_RULES.get(sub.kind, '') if sub.kind != 'dsa' else ''}").strip(),
+        cache_key=_cache(sub, f"fresh:{topic.key}:{k}:{diff}{lang_part}"),
     )
 
 
-def _theory_block(day: int, topic: Topic, minutes: int, level: str) -> PlannedBlock:
+def _theory_block(day: int, topic: Topic, minutes: int, level: str, sub: Subject = DSA_SUBJECT) -> PlannedBlock:
     bucket = "beginner" if level == "beginner" else "refresher"
     style = ("The learner is a complete beginner: define every term, use everyday analogies, build up slowly, "
              "no unexplained jargon." if level == "beginner" else
-             "The learner knows programming basics: be concise, focus on patterns, pitfalls and complexity.")
+             f"The learner already knows the basics of {sub.name}: be concise, focus on patterns, pitfalls and good practice.")
+    worked = "a tiny worked example with a trace" if sub.kind in ("dsa", "code") else "a small worked example with concrete sample data"
     return PlannedBlock(
         day=day, title=f"{topic.name}: Concept Lesson", mode=TaskMode.THEORY, minutes=minutes, phase="theory",
         category=topic.name, topic_key=topic.key, difficulty="Foundational" if level == "beginner" else "Intermediate",
         tags=[topic.name, "theory"],
-        gen_hint=f"Write the lesson '{topic.name}'. Must cover: {topic.theory} {style} Include a tiny worked example with a trace.",
-        cache_key=f"dsa:theory:{topic.key}:{bucket}",
+        gen_hint=(f"Write the lesson '{topic.name}'" + (f" (subject: {sub.name})" if sub.kind != "dsa" else "")
+                  + f". Must cover: {topic.theory} {style} Include {worked}."),
+        cache_key=_cache(sub, f"theory:{topic.key}:{bucket}"),
     )
 
 
 def _fill_coding(day: int, topic: Topic, queue: list[Problem], used: list[int], budget: int, language: str,
-                 fresh_diff: str, fresh_counter: list[int]) -> list[PlannedBlock]:
+                 fresh_diff: str, fresh_counter: list[int], sub: Subject = DSA_SUBJECT) -> list[PlannedBlock]:
     out: list[PlannedBlock] = []
     remaining = budget
     while remaining >= 15:
         if used[0] < len(queue):
             p = queue[used[0]]; used[0] += 1
-            diff, block_fn = p.difficulty, lambda m, p=p: _problem_block(day, topic, p, m, language)
+            diff, block_fn = p.difficulty, lambda m, p=p: _problem_block(day, topic, p, m, language, sub=sub)
         else:
             fresh_counter[0] += 1
             k = fresh_counter[0]
             diff = fresh_diff
-            block_fn = lambda m, k=k: _fresh_problem(day, topic, k, fresh_diff, m, language)
+            block_fn = lambda m, k=k: _fresh_problem(day, topic, k, fresh_diff, m, language, sub)
         dur = min(DEFAULT_MIN[diff], remaining)
         if remaining - dur < 15:
             dur = remaining
@@ -166,14 +193,19 @@ def _fill_coding(day: int, topic: Topic, queue: list[Problem], used: list[int], 
     return out
 
 
-def plan_dsa(*, mode: str, level: str, days: int, minutes: int, difficulty: str = "mixed",
-             topics: Optional[list[str]] = None, known: Optional[list[str]] = None, weak: Optional[list[str]] = None,
-             language: str = "python") -> PlanResult:
+def plan_dsa(**kw) -> PlanResult:
+    return plan_subject(DSA_SUBJECT, **kw)
+
+
+def plan_subject(sub: Subject, *, mode: str, level: str, days: int, minutes: int, difficulty: str = "mixed",
+                 topics: Optional[list[str]] = None, known: Optional[list[str]] = None, weak: Optional[list[str]] = None,
+                 language: str = "python") -> PlanResult:
     known_s, weak_s = set(known or []), set(weak or [])
+    valid = {t.key for t in sub.topics}
     for k in list(topics or []) + list(known_s) + list(weak_s):
-        if k not in DSA_BY_KEY:
+        if k not in valid:
             raise PlanError(f"Unknown topic '{k}'")
-    selected = [t for t in DSA if not topics or t.key in topics]
+    selected = [t for t in sub.topics if not topics or t.key in topics]
     if mode == "LEARN":
         selected = [t for t in selected if t.key not in known_s]
     if not selected:
@@ -204,22 +236,22 @@ def plan_dsa(*, mode: str, level: str, days: int, minutes: int, difficulty: str 
                 share = 0.40 if level == "beginner" else 0.28
                 th = r5(min(45, max(15, minutes * share))) if minutes >= 30 else minutes
                 th = min(th, minutes)
-                blocks.append(_theory_block(day, t, th, level))
+                blocks.append(_theory_block(day, t, th, level, sub))
                 budget = minutes - th
-            blocks.extend(_fill_coding(day, t, queue, used, budget, language, fresh_diff, fresh))
+            blocks.extend(_fill_coding(day, t, queue, used, budget, language, fresh_diff, fresh, sub))
         topic_rows.append({"key": t.key, "name": t.name, "days": len(mine), "first_day": mine[0], "last_day": mine[-1]})
         covered.append(t.name)
 
     for rd in sorted(review_days):
         names = [r["name"] for r in topic_rows if r["first_day"] < rd]
-        blocks.extend(_review_day(rd, names or covered, minutes, mode, language))
+        blocks.extend(_review_day(rd, names or covered, minutes, mode, language, sub))
     for md in sorted(mock_days):
-        blocks.extend(_mock_day(md, covered, minutes, language, final=(md == days)))
+        blocks.extend(_mock_day(md, covered, minutes, language, final=(md == days), sub=sub))
     blocks.sort(key=lambda b: b.day)
     return PlanResult(blocks, topic_rows, trimmed, days)
 
 
-def _review_day(day: int, covered: list[str], minutes: int, mode: str, language: str) -> list[PlannedBlock]:
+def _review_day(day: int, covered: list[str], minutes: int, mode: str, language: str, sub: Subject = DSA_SUBJECT) -> list[PlannedBlock]:
     names = ", ".join(covered[-6:])
     out: list[PlannedBlock] = []
     budget = minutes
@@ -235,15 +267,23 @@ def _review_day(day: int, covered: list[str], minutes: int, mode: str, language:
         dur = min(40, budget)
         if budget - dur < 15:
             dur = budget
-        out.append(PlannedBlock(day=day, title=f"Mixed Review Problem {k}", mode=TaskMode.CODE, minutes=dur, phase="review",
-                                category="Review", difficulty="Medium", tags=["review"],
-                                gen_hint=f"ONE medium problem that combines ideas from: {names}. Different from the textbook list.",
+        out.append(PlannedBlock(day=day, title=f"Mixed Review {'Problem' if sub.kind == 'dsa' else 'Exercise'} {k}", mode=sub.practice_mode,
+                                minutes=dur, phase="review", category="Review", difficulty="Medium",
+                                tags=["review"] + (["exercise"] if sub.practice_mode == TaskMode.PROSE else []),
+                                gen_hint=f"ONE medium {sub.noun} that combines ideas from: {names}. Different from the textbook list. "
+                                         f"{_KIND_RULES.get(sub.kind, '') if sub.kind != 'dsa' else ''}".strip(),
                                 cache_key=None))
         budget -= dur
     return out
 
 
-def _mock_day(day: int, covered: list[str], minutes: int, language: str, final: bool) -> list[PlannedBlock]:
+def _mock_title(sub: Subject, final: bool) -> str:
+    if sub.kind == "dsa":
+        return "Final Mock Interview Round" if final else "Mock Interview Round"
+    return "Final Capstone Challenge" if final else "Capstone Challenge"
+
+
+def _mock_day(day: int, covered: list[str], minutes: int, language: str, final: bool, sub: Subject = DSA_SUBJECT) -> list[PlannedBlock]:
     names = ", ".join(covered[-8:]) or "core data structures"
     out: list[PlannedBlock] = []
     budget = minutes
@@ -254,13 +294,19 @@ def _mock_day(day: int, covered: list[str], minutes: int, language: str, final: 
         if budget - dur < 20:
             dur = budget
         out.append(PlannedBlock(
-            day=day, title=("Final Mock Interview Round" if final else "Mock Interview Round") + (f" — Problem {k}" if minutes >= 90 else ""),
-            mode=TaskMode.CODE, minutes=dur, phase="mock", category="Mock Interview", difficulty="Medium",
-            tags=["mock", "timed"], gen_hint=f"A timed interview-style problem (medium, may lean hard) touching: {names}. State constraints clearly; expect an optimal solution."))
+            day=day, title=(_mock_title(sub, final)) + (f" — Part {k}" if minutes >= 90 and sub.kind != "dsa" else f" — Problem {k}" if minutes >= 90 else ""),
+            mode=sub.practice_mode, minutes=dur, phase="mock", category="Mock Interview" if sub.kind == "dsa" else "Capstone", difficulty="Medium",
+            tags=["mock", "timed"] + (["exercise"] if sub.practice_mode == TaskMode.PROSE else []),
+            gen_hint=(f"A timed interview-style problem (medium, may lean hard) touching: {names}. State constraints clearly; expect an optimal solution."
+                      if sub.kind == "dsa" else
+                      f"A capstone {sub.noun} for {sub.name} (medium) that combines: {names}. Realistic scenario, clear success criteria. {_KIND_RULES.get(sub.kind, '')}".strip())))
         budget -= dur
     if not out:
-        out.append(PlannedBlock(day=day, title="Mock Interview Round", mode=TaskMode.CODE, minutes=minutes, phase="mock",
-                                category="Mock Interview", difficulty="Medium", gen_hint=f"A short interview-style problem touching: {names}."))
+        out.append(PlannedBlock(day=day, title=_mock_title(sub, False), mode=sub.practice_mode, minutes=minutes, phase="mock",
+                                category="Mock Interview" if sub.kind == "dsa" else "Capstone", difficulty="Medium",
+                                tags=["mock"] + (["exercise"] if sub.practice_mode == TaskMode.PROSE else []),
+                                gen_hint=f"A short {'interview-style problem' if sub.kind == 'dsa' else 'capstone ' + sub.noun} touching: {names}. "
+                                         f"{_KIND_RULES.get(sub.kind, '') if sub.kind != 'dsa' else ''}".strip()))
     return out
 
 

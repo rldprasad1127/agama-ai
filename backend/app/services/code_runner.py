@@ -50,6 +50,7 @@ LANGS: dict[str, Lang] = {
     "cpp": Lang("cpp", "C++ 20", "cpp", "cpp", ("g++",), False),
     "go": Lang("go", "Go", "go", "go", ("go",), False, False),
     "rust": Lang("rust", "Rust", "rust", "rs", ("rustc",), False),
+    "sql": Lang("sql", "SQL (SQLite)", "sql", "sql", ("python3",), False),
 }
 ALIASES = {"py": "python", "python3": "python", "js": "javascript", "node": "javascript", "ts": "typescript",
            "c++": "cpp", "cxx": "cpp", "golang": "go", "rs": "rust"}
@@ -115,6 +116,38 @@ for _t in _tests:
     _res.append(_r)
 sys.stdout.flush()
 print("\\n{token}" + json.dumps(_res))
+'''
+
+
+_SQL_HARNESS = '''
+import sqlite3
+con = sqlite3.connect(":memory:")
+src = open("solution.sql", encoding="utf-8").read()
+buf, shown = "", 0
+def show(cur):
+    global shown
+    cols = [d[0] for d in cur.description]
+    rows = cur.fetchmany(200)
+    w = [max(len(str(c)), *(len(str(r[i])) for r in rows)) if rows else len(str(c)) for i, c in enumerate(cols)]
+    print(" | ".join(str(c).ljust(w[i]) for i, c in enumerate(cols)))
+    print("-+-".join("-" * x for x in w))
+    for r in rows:
+        print(" | ".join(str(v).ljust(w[i]) for i, v in enumerate(r)))
+    print("(%d row%s)\\n" % (len(rows), "" if len(rows) == 1 else "s"))
+    shown += 1
+for line in src.splitlines(keepends=True):
+    buf += line
+    if sqlite3.complete_statement(buf):
+        cur = con.execute(buf)
+        if cur.description:
+            show(cur)
+        buf = ""
+if buf.strip() and not all(l.strip().startswith("--") or not l.strip() for l in buf.splitlines()):
+    cur = con.execute(buf)
+    if cur.description:
+        show(cur)
+if not shown:
+    print("Statements ran OK, but no query returned rows. End with a SELECT to see a result.")
 '''
 
 
@@ -212,6 +245,9 @@ async def run_code(code: str, language: Optional[str], stdin: str = "", tests: O
                     argv = ["node", "_harness.js"]
                 else:
                     argv = ["node", src_name]
+            elif key == "sql":
+                (work / "_harness.py").write_text(_SQL_HARNESS, encoding="utf-8")
+                argv = [shutil.which("python3") or sys.executable, "-I", "_harness.py"]
             elif key == "typescript":
                 argv = ["node", "--experimental-strip-types", "--no-warnings", src_name]
             elif key == "go":

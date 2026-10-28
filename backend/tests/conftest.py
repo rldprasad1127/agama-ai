@@ -43,6 +43,12 @@ class FakeOllama:
         if self.override is not None:
             return self.override
         import re
+        if "study roadmap" in system:
+            if "<subject>malware" in user:
+                return {"refused": True, "reason": "harmful"}
+            return {"summary": "Build dashboards.", "topics": [
+                {"name": f"Topic {i}", "theory": f"Learn idea {i}.", "exercises": [{"title": f"Exercise {i}.{j}", "difficulty": "Easy"} for j in range(1, 4)]}
+                for i in range(1, 7)]}
         if "patient, encouraging tutor" in system:
             return {"text": "Think of it like a queue at a shop: first in, first out."}
         if "answering a learner's question" in system:

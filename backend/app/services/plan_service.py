@@ -17,27 +17,56 @@ from app.models.plan_schemas import (
 )
 from app.models.task import TaskBlock
 from app.models.user import User
-from app.services import curriculum
+from app.services import curriculum, subjects
+from app.services.subjects import Subject
 from app.services.planner import (
-    DIFF_RANK, PlanError, dates_between, PlanResult, PlannedBlock, plan_dates, plan_dsa, plan_english, plan_interview,
+    DIFF_RANK, PlanError, dates_between, PlanResult, PlannedBlock, plan_dates, plan_english, plan_interview, plan_subject,
 )
 
 
 # ───────────────────────── building ─────────────────────────
-def _title(body: PlanCreate) -> str:
+MAX_PLANS = 5                 # active + paused plans per learner
+OVER_BUDGET_MINUTES = 180     # combined daily minutes above which we warn
+
+
+def resolve_subject(body: PlanCreate) -> Subject:
+    if body.track == "DSA":
+        return subjects.DSA_SUBJECT
+    if body.track != "SUBJECT":
+        raise HTTPException(422, "Not a subject plan")
+    if body.subject == "custom":
+        if not body.custom_name.strip():
+            raise HTTPException(422, "Give your subject a name")
+        sub = subjects.custom_subject(body.custom_name, [t.model_dump() for t in body.custom_topics])
+        if len(sub.topics) < 2:
+            raise HTTPException(422, "A custom roadmap needs at least 2 topics")
+        return sub
+    sub = subjects.get(body.subject)
+    if sub is None or sub.key == "dsa":
+        raise HTTPException(422, f"Unknown subject '{body.subject}'")
+    return sub
+
+
+def _title(body: PlanCreate, sub: Optional[Subject] = None) -> str:
     if body.track == "INTERVIEW":
         return f"{body.days}-day interview prep: {body.role.strip()}"
     if body.track == "ENGLISH":
         return f"{body.days}-day English speaking ({body.cefr})"
-    return f"{body.days}-day DSA " + ("learning path" if body.mode == "LEARN" else "practice plan")
+    name = "DSA" if body.track == "DSA" or sub is None else sub.name
+    return f"{body.days}-day {name} " + ("learning path" if body.mode == "LEARN" else "practice plan")
+
+
+def _lang(body: PlanCreate, sub: Subject) -> str:
+    return sub.language or body.language or "python"
 
 
 def compute(body: PlanCreate) -> PlanResult:
     try:
-        if body.track == "DSA":
-            return plan_dsa(mode=body.mode, level=body.level, days=body.days, minutes=body.minutes_per_day,
-                            difficulty=body.difficulty, topics=body.topics or None, known=body.known_topics,
-                            weak=body.weak_topics, language=body.language)
+        if body.track in ("DSA", "SUBJECT"):
+            sub = resolve_subject(body)
+            return plan_subject(sub, mode=body.mode, level=body.level, days=body.days, minutes=body.minutes_per_day,
+                                difficulty=body.difficulty, topics=body.topics or None, known=body.known_topics,
+                                weak=body.weak_topics, language=_lang(body, sub))
         if body.track == "INTERVIEW":
             return plan_interview(days=body.days, minutes=body.minutes_per_day, role=body.role,
                                   experience=body.experience, company_type=body.company_type)
@@ -46,8 +75,15 @@ def compute(body: PlanCreate) -> PlanResult:
         raise HTTPException(422, str(e)) from e
 
 
-def preview(body: PlanCreate, today: dt.date) -> PlanPreview:
+async def plan_load(user: User) -> int:
+    """Daily minutes of the learner's other active plans."""
+    plans = await LearningPlan.find(LearningPlan.user_id == user.id, LearningPlan.status == "active").to_list()
+    return sum(p.minutes_per_day for p in plans)
+
+
+async def preview(user: User, body: PlanCreate, today: dt.date) -> PlanPreview:
     res = compute(body)
+    sub = resolve_subject(body) if body.track in ("DSA", "SUBJECT") else None
     start = body.start_date or today
     dates = plan_dates(start, body.days, body.skip_weekends)
     by_phase: dict[str, int] = defaultdict(int)
@@ -57,10 +93,13 @@ def preview(body: PlanCreate, today: dt.date) -> PlanPreview:
     for d in range(1, min(7, body.days) + 1):
         sample.append(PreviewDay(day=d, date=dates[d - 1], blocks=[
             PreviewBlock(title=b.title, mode=b.mode.value, minutes=b.minutes, phase=b.phase) for b in res.blocks if b.day == d]))
+    other = await plan_load(user)
+    combined = other + body.minutes_per_day
     return PlanPreview(
-        title=_title(body), track=body.track, mode=body.mode, days=body.days, minutes_per_day=body.minutes_per_day,
+        title=_title(body, sub), track=body.track, mode=body.mode, days=body.days, minutes_per_day=body.minutes_per_day,
         start_date=dates[0], end_date=dates[-1], topics=res.topics, trimmed_topics=res.trimmed,
-        total_blocks=len(res.blocks), total_minutes=sum(b.minutes for b in res.blocks), by_phase=dict(by_phase), sample_days=sample)
+        total_blocks=len(res.blocks), total_minutes=sum(b.minutes for b in res.blocks), by_phase=dict(by_phase), sample_days=sample,
+        other_minutes_per_day=other, combined_minutes_per_day=combined, over_budget=combined > OVER_BUDGET_MINUTES)
 
 
 async def _max_order(user: User, dates: list[dt.date]) -> dict[dt.date, int]:
@@ -85,26 +124,33 @@ def _to_doc(user: User, plan: LearningPlan, b: PlannedBlock, date: dt.date, orde
     )
 
 
-async def archive_active(user: User) -> None:
-    for old in await LearningPlan.find(LearningPlan.user_id == user.id, LearningPlan.status == "active").to_list():
-        await TaskBlock.find(TaskBlock.plan_id == old.id, TaskBlock.status == TaskStatus.PENDING).delete()
-        old.status = "archived"
-        await old.save()
-
-
 async def create_plan(user: User, body: PlanCreate, today: dt.date) -> LearningPlan:
+    """Create a plan. Existing plans are left untouched — a learner can follow several at once."""
     res = compute(body)
+    sub = resolve_subject(body) if body.track in ("DSA", "SUBJECT") else None
+    live = await LearningPlan.find(LearningPlan.user_id == user.id, {"status": {"$in": ["active", "paused"]}}).to_list()
+    if len(live) >= MAX_PLANS:
+        raise HTTPException(status.HTTP_409_CONFLICT, f"You already have {MAX_PLANS} plans. Finish, pause-and-remove or stop one before adding another.")
     start = body.start_date or today
     dates = plan_dates(start, body.days, body.skip_weekends)
-    await archive_active(user)
-    language = body.language or user.preferences.default_language
+    language = (sub.language if sub and sub.language else None) or body.language or user.preferences.default_language
+    if sub is not None:
+        subject_key, subject_name, icon, custom = (sub.key, sub.name, sub.icon, sub.custom)
+        prio = {t.key: t.priority for t in sub.topics}
+    elif body.track == "INTERVIEW":
+        subject_key, subject_name, icon, custom, prio = "interview", "Interview prep", "record_voice_over", False, {}
+    else:
+        subject_key, subject_name, icon, custom, prio = "english", "English speaking", "forum", False, {}
+    used_colors = {p.color for p in live}
+    color = next((c for c in range(6) if c not in used_colors), len(live) % 6)
     plan = LearningPlan(
-        user_id=user.id, track=body.track, mode=body.mode if body.track == "DSA" else "LEARN", title=_title(body),
+        user_id=user.id, track=body.track, subject=subject_key, subject_name=subject_name, icon=icon, color=color, custom=custom,
+        mode=body.mode if sub is not None else "LEARN", title=_title(body, sub),
         level=body.level, days=body.days, minutes_per_day=body.minutes_per_day, skip_weekends=body.skip_weekends,
         start_date=dates[0], end_date=dates[-1], difficulty=body.difficulty, language=language,
-        topics=[PlanTopic(**t) for t in res.topics], trimmed_topics=res.trimmed,
+        topics=[PlanTopic(**t, priority=prio.get(t["key"], 0)) for t in res.topics], trimmed_topics=res.trimmed,
         config={"role": body.role, "experience": body.experience, "company_type": body.company_type, "cefr": body.cefr}
-        if body.track != "DSA" else {},
+        if sub is None else ({"custom_topics": [t.model_dump() for t in body.custom_topics]} if custom else {}),
     )
     await plan.insert()
     next_order = await _max_order(user, dates)
@@ -115,16 +161,27 @@ async def create_plan(user: User, body: PlanCreate, today: dt.date) -> LearningP
         docs.append(_to_doc(user, plan, b, d, next_order[d], language))
     if docs:
         await TaskBlock.insert_many(docs)
-    user.onboarded, user.daily_target_minutes = True, body.minutes_per_day
-    user.goal = {"DSA": "dsa", "INTERVIEW": "interview", "ENGLISH": "english"}[body.track]
+    user.onboarded = True
+    user.daily_target_minutes = min(960, sum(p.minutes_per_day for p in live if p.status == "active") + body.minutes_per_day)
     if body.track == "DSA":
-        user.learner_level = body.level
+        user.goal, user.learner_level = "dsa", body.level
+    elif body.track in ("INTERVIEW", "ENGLISH"):
+        user.goal = "interview" if body.track == "INTERVIEW" else "english"
+    elif not user.goal or user.goal == "explore":
+        user.goal = "explore"
     await user.save()
     return plan
 
 
 async def active_plan(user: User) -> Optional[LearningPlan]:
-    return await LearningPlan.find_one(LearningPlan.user_id == user.id, LearningPlan.status == "active")
+    """The oldest active plan (kept for the single-plan callers)."""
+    return await LearningPlan.find(LearningPlan.user_id == user.id, LearningPlan.status == "active").sort("+created_at").first_or_none()
+
+
+async def list_plans(user: User) -> list[LearningPlan]:
+    rows = await LearningPlan.find(LearningPlan.user_id == user.id, {"status": {"$in": ["active", "paused", "completed"]}}).sort("+created_at").to_list()
+    order = {"active": 0, "paused": 1, "completed": 2}
+    return sorted(rows, key=lambda p: (order.get(p.status, 3), p.created_at))
 
 
 async def owned_plan(plan_id: str, user: User) -> LearningPlan:
@@ -186,7 +243,8 @@ async def build_out(plan: LearningPlan, today: dt.date) -> PlanOut:
     return PlanOut(
         id=str(plan.id), title=plan.title, track=plan.track, mode=plan.mode, level=plan.level, days=plan.days,
         minutes_per_day=plan.minutes_per_day, start_date=plan.start_date, end_date=plan.end_date, difficulty=plan.difficulty,
-        language=plan.language, status=plan.status, skip_weekends=plan.skip_weekends, day_index=idx, days_left=left,
+        language=plan.language, status=plan.status, subject=plan.subject, subject_name=plan.subject_name or plan.title, icon=plan.icon,
+        color=plan.color, custom=plan.custom, skip_weekends=plan.skip_weekends, day_index=idx, days_left=left,
         blocks_total=len(blocks), blocks_done=len(done), minutes_total=mins_total, minutes_done=mins_done,
         progress_pct=round(mins_done * 100 / mins_total) if mins_total else 0,
         missed_count=len(missed), missed_minutes=sum(b.duration_minutes for b in missed), today_count=len(todays),
@@ -240,6 +298,8 @@ def _layout(blocks: list[TaskBlock], dates: list[dt.date], cap: int, first_cap: 
 
 
 async def rebalance(user: User, plan: LearningPlan, today: dt.date, extend_days: int) -> RebalanceOut:
+    if plan.status == "paused":
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "This plan is paused — resume it first.")
     blocks = [b for b in await plan_blocks(plan) if b.status == TaskStatus.PENDING]
     if not blocks:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Nothing left to re-plan — every block is done.")
@@ -255,8 +315,17 @@ async def rebalance(user: User, plan: LearningPlan, today: dt.date, extend_days:
     first_cap = max(0, plan.minutes_per_day - sum(b.duration_minutes for b in all_done_today))
     if first_cap < 15 and len(dates) > 1:
         dates = dates[1:]; first_cap = plan.minutes_per_day
-    prio = {t.key: curriculum.DSA_BY_KEY[t.key].priority if t.key in curriculum.DSA_BY_KEY else 0 for t in plan.topics}
     blocks.sort(key=lambda b: ((b.plan_day or 0), b.order_index))
+    return await _repack(user, plan, blocks, dates, first_cap, new_end, today)
+
+
+def _prio(plan: LearningPlan) -> dict[str, int]:
+    return {t.key: t.priority or (curriculum.DSA_BY_KEY[t.key].priority if t.key in curriculum.DSA_BY_KEY else 0) for t in plan.topics}
+
+
+async def _repack(user: User, plan: LearningPlan, blocks: list[TaskBlock], dates: list[dt.date], first_cap: int,
+                  new_end: dt.date, today: dt.date) -> RebalanceOut:
+    prio = _prio(plan)
     dropped: list[TaskBlock] = []
     placed = _layout(blocks, dates, plan.minutes_per_day, first_cap)
     while placed is None and blocks:
@@ -294,6 +363,62 @@ async def drop_plan(user: User, plan: LearningPlan) -> None:
     await TaskBlock.find(TaskBlock.plan_id == plan.id, TaskBlock.status == TaskStatus.PENDING).delete()
     plan.status = "archived"
     await plan.save()
+    await sync_daily_target(user)
+
+
+async def sync_daily_target(user: User) -> None:
+    """Daily target = combined minutes of the learner's active plans (unchanged when they have none)."""
+    plans = await LearningPlan.find(LearningPlan.user_id == user.id, LearningPlan.status == "active").to_list()
+    if plans:
+        user.daily_target_minutes = min(960, max(15, sum(p.minutes_per_day for p in plans)))
+        await user.save()
+
+
+async def pause_plan(user: User, plan: LearningPlan) -> None:
+    """Take the plan's unfinished blocks off the calendar (they keep their order) until the learner resumes."""
+    if plan.status != "active":
+        raise HTTPException(status.HTTP_409_CONFLICT, "Only an active plan can be paused.")
+    for b in await TaskBlock.find(TaskBlock.plan_id == plan.id, TaskBlock.status == TaskStatus.PENDING).to_list():
+        b.date = None
+        await b.save()
+    plan.status = "paused"
+    plan.paused_at = dt.datetime.now(dt.timezone.utc)
+    await plan.save()
+    await sync_daily_target(user)
+
+
+async def resume_plan(user: User, plan: LearningPlan, today: dt.date) -> RebalanceOut:
+    """Re-lay the unfinished blocks from today, stretching the end date only as far as needed."""
+    if plan.status != "paused":
+        raise HTTPException(status.HTTP_409_CONFLICT, "Only a paused plan can be resumed.")
+    blocks = [b for b in await plan_blocks(plan) if b.status == TaskStatus.PENDING]
+    if not blocks:
+        plan.status = "completed"
+        await plan.save()
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Nothing left in this plan — every block is done.")
+    blocks.sort(key=lambda b: ((b.plan_day or 0), b.order_index))
+    done_today = [b for b in await plan_blocks(plan) if b.status == TaskStatus.COMPLETED and b.date == today]
+    first_cap = max(0, plan.minutes_per_day - sum(b.duration_minutes for b in done_today))
+    # Start tomorrow when today's allowance is already used; otherwise start today.
+    start = today
+    if first_cap < 15:
+        start = plan_dates(today + dt.timedelta(days=1), 1, plan.skip_weekends)[0]
+        first_cap = plan.minutes_per_day
+    # keep the original end date when the remaining work still fits, otherwise stretch just enough
+    new_end = max(plan.end_date, start)
+    plan.status = "active"
+    plan.paused_at = None
+    for extra in range(0, 400):
+        dates = dates_between(start, new_end + dt.timedelta(days=extra), plan.skip_weekends)
+        if dates and _layout(blocks, dates, plan.minutes_per_day, first_cap) is not None:
+            new_end = new_end + dt.timedelta(days=extra)
+            break
+    else:                                                       # pragma: no cover - unreachable with sane block sizes
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Could not fit this plan again. Try stopping it and creating a new one.")
+    dates = dates_between(start, new_end, plan.skip_weekends)
+    out = await _repack(user, plan, blocks, dates, first_cap, new_end, today)
+    await sync_daily_target(user)
+    return out
 
 
 # ───────────────────────── adaptive hooks ─────────────────────────
@@ -332,12 +457,14 @@ async def on_block_evaluated(user: User, task: TaskBlock, score: int, today: dt.
         st.score_sum += score
     if task.phase in ("practice", "extra"):
         st.high_streak = st.high_streak + 1 if score >= 90 else 0
-        if score < 55 and st.extras_added < 2 and first_time and task.topic_key in curriculum.DSA_BY_KEY:
+        if score < 55 and st.extras_added < 2 and first_time and plan.track in ("DSA", "SUBJECT") and task.task_mode in (TaskMode.CODE, TaskMode.PROSE):
             st.extras_added += 1
+            written = task.task_mode == TaskMode.PROSE
             await add_extra_block(
-                user, plan, task, f"Extra Practice: {task.title} (easier)", TaskMode.CODE, min(30, plan.minutes_per_day), 
-                f"An EASIER warm-up on the same pattern as \"{task.title}\" ({task.category}). One small problem, 2-3 steps to solve, "
-                "so the learner can rebuild confidence before the harder ones.", today)
+                user, plan, task, f"Extra Practice: {task.title} (easier)", task.task_mode, min(30, plan.minutes_per_day),
+                f"An EASIER warm-up on the same idea as \"{task.title}\" ({task.category}). One small {'exercise' if written else 'problem'}, 2-3 steps to solve, "
+                "so the learner can rebuild confidence before the harder ones."
+                + (" Written exercise: scenario and sample data in prompt_context, a 3-point checklist, 40-120 words expected." if written else ""), today)
         elif plan.difficulty == "adaptive" and st.high_streak >= 3:
             for b in await TaskBlock.find(TaskBlock.plan_id == plan.id, TaskBlock.topic_key == task.topic_key,
                                           TaskBlock.status == TaskStatus.PENDING).to_list():
